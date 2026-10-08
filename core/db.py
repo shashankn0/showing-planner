@@ -57,3 +57,10 @@ def session_scope(settings: Settings | None = None) -> Iterator[Session]:
         raise
     finally:
         session.close()
+
+
+def dispose_engines() -> None:
+    """Close pooled connections (needed on Windows before deleting a database file)."""
+    for engine in _engines.values():
+        engine.dispose()
+    _engines.clear()
