@@ -1,0 +1,12 @@
+# Runtime (pinned to versions this project was developed and tested with).
+# Phase 2 adds torch + open_clip_torch (installed separately: CUDA vs CPU wheel).
+# Phase 3 adds ortools.
+streamlit==1.65.0
+pandas==3.0.6
+SQLAlchemy==2.1.4
+alembic==1.20.0
+PyYAML==6.0.3
+requests==2.34.2
+python-dotenv==1.2.4
+pillow==12.3.0
+openpyxl==3.1.5
