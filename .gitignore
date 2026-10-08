@@ -1,0 +1,35 @@
+# --- Local-only data: MLS-derived listings, photos, embeddings, DBs. NEVER commit. ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Secrets ---
+.env
+*.key
+*.pem
+
+# --- Models: commit model cards (*.md, *.json), not weights ---
+models/**/*.pt
+models/**/*.pth
+models/**/*.safetensors
+models/**/*.npy
+models/**/*.joblib
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
