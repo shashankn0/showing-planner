@@ -1,0 +1,5 @@
+ListingId,StandardStatus,StreetNumber,StreetDirPrefix,StreetName,StreetSuffix,UnitNumber,City,StateOrProvince,PostalCode,CountyOrParish,ListPrice,BedroomsTotal,BathroomsTotalInteger,LivingArea,YearBuilt,Latitude,Longitude,ShowingRequirements,ListAgentFullName
+SYN8100001,Active,1450,,Mockingbird,Ln,,Testville,GA,30307,Demo County,410000,4,3,2310,2001,33.7701,-84.3512,"Appointment Required",Pat Example
+SYN8100002,Active,88,N,Madeup,Ave,12,Testville,GA,30308,Demo County,239900,2,2,1040,2009,33.7812,-84.3921,"Go Direct",Sam Placeholder
+SYN8100003,Pending,2020,,Faux,Cir,,Demoburg,GA,30309,Sample County,555000,4,3,2890,2012,33.8023,-84.4210,"Courtesy Call Only",Lee Fictional
+SYN8100004,Active,15,SW,Pretend,Pkwy,,Samplewood,GA,30310,Sample County,189000,3,1,1280,1975,33.7345,-84.4602,"Appointment Required",Pat Example

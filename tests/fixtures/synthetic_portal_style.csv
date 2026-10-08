@@ -1,0 +1,5 @@
+SALE TYPE,PROPERTY TYPE,ADDRESS,CITY,STATE OR PROVINCE,ZIP OR POSTAL CODE,PRICE,BEDS,BATHS,SQUARE FEET,LOT SIZE,YEAR BUILT,DAYS ON MARKET,$/SQUARE FEET,STATUS,URL (SEE https://example.invalid FOR INFO),SOURCE,MLS#,LATITUDE,LONGITUDE
+MLS Listing,Single Family Residential,901 Pretend Pl,Testville,GA,30311,"$349,000",3,2.5,"1,990","8,712",1999,12,175,Active,https://example.invalid/home/1,SYNTH-MLS,SYN9200001,33.7456,-84.4301
+MLS Listing,Townhouse,415 Mock Row,Demoburg,GA,30312,"$275,000",3,2.5,"1,640","2,178",2016,30,168,Active,https://example.invalid/home/2,SYNTH-MLS,SYN9200002,33.7512,-84.3677
+MLS Listing,Condo/Co-op,77 Sample St #1205,Testville,GA,30313,"$199,000",1,1,780,,2008,45,255,Active,https://example.invalid/home/3,SYNTH-MLS,SYN9200003,33.7620,-84.3920
+MLS Listing,Single Family Residential,6 Fictive Way,Samplewood,GA,30314,"$512,500",4,3.5,"2,750","21,780",1985,7,186,Active,https://example.invalid/home/4,SYNTH-MLS,SYN9200004,33.7388,-84.4105

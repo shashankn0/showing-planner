@@ -1,0 +1,124 @@
+# Header synonyms used by the CSV/Excel importer to recognise columns in ANY export
+# (MLS exports, portal downloads, hand-made spreadsheets).
+#
+# Edit freely: add whatever your export calls a field and re-run the import.
+# Matching is case-insensitive and ignores punctuation, so "MLS #", "mls_number" and
+# "MLSNumber" are the same. "aliases" are trusted; "weak_aliases" need the values to look right.
+# Each field is also checked against what the values look like (zip codes, prices, states...),
+# so a wrong guess on a header is usually caught.
+
+source_listing_id:
+  aliases: [mls, mls number, mls no, mls id, mls num, ml number, ml num, ml, listing id,
+            listing number, listing no, list number, list no, listing key, listingkey,
+            listing number mls, property id]
+  weak_aliases: [id, number, no, reference, ref]
+
+address:
+  aliases: [address, full address, property address, street address, listing address,
+            unparsed address, address line 1, address 1, address1, site address, situs address,
+            addr, street line, location address, house address, street]
+  weak_aliases: [location, property, name]
+
+street_number:
+  aliases: [street number, street no, street num, house number, house no, address number,
+            st number, st no, st num, streetnumber, number]
+
+street_dir_prefix:
+  aliases: [street dir prefix, street direction prefix, dir prefix, predirectional, pre dir,
+            street prefix, direction prefix, st dir prefix, prefix]
+
+street_name:
+  aliases: [street name, st name, streetname, road name]
+  weak_aliases: [street]
+
+street_suffix:
+  aliases: [street suffix, st suffix, street type, st type, road type, suffix]
+
+street_dir_suffix:
+  aliases: [street dir suffix, street direction suffix, dir suffix, postdirectional, post dir,
+            st dir suffix]
+
+unit:
+  aliases: [unit, unit number, unit no, unit num, apt, apt number, apartment, suite, ste,
+            address line 2, address 2, address2, unit apt]
+
+city:
+  aliases: [city, town, city name, property city, municipality, postal city, city town]
+
+state:
+  aliases: [state, st, state or province, state province, state code, province,
+            state abbreviation, state abbr, stateorprovince]
+
+postal_code:
+  aliases: [zip, zip code, zipcode, zip5, postal code, postal, zip or postal code, zip plus 4,
+            post code]
+
+county:
+  aliases: [county, county or parish, county name, countyorparish, parish]
+
+latitude:
+  aliases: [latitude, lat, geo lat, latitude y, lat y, y coord, y coordinate]
+
+longitude:
+  aliases: [longitude, long, lng, lon, geo lon, geo long, longitude x, long x, x coord,
+            x coordinate]
+
+list_price:
+  aliases: [list price, listing price, price, current price, asking price, asking, list prc,
+            lp, current list price, list price dollars, price dollars]
+  weak_aliases: [amount, value, cost]
+
+status:
+  aliases: [status, listing status, mls status, standard status, standardstatus, current status,
+            status code, prop status]
+
+property_type:
+  aliases: [property type, prop type, property sub type, property subtype, propertysubtype,
+            property class, home type, listing type, style, type, category]
+
+beds:
+  aliases: [beds, bedrooms, bedroom, bed, br, bd, beds total, bedrooms total, bedroomstotal,
+            number of bedrooms, total bedrooms, bed count, beds number, bedrooms number,
+            bds, bdrms, bdrm, bedrms]
+
+baths_total:
+  aliases: [baths, bathrooms, bathroom, bath, ba, baths total, bathrooms total,
+            bathrooms total integer, bathroomstotalinteger, total baths, total bathrooms,
+            number of bathrooms, baths number, bath count, bths, bth]
+
+baths_full:
+  aliases: [full baths, baths full, bathrooms full, bathroomsfull, full bath, bath full, fb,
+            full bathrooms, number of full baths, baths number full]
+
+baths_half:
+  aliases: [half baths, baths half, bathrooms half, bathroomshalf, half bath, bath half, hb,
+            half bathrooms, partial baths, number of half baths, baths number half]
+
+sqft:
+  aliases: [sqft, sq ft, square feet, square footage, living area, livingarea, heated sqft,
+            heated sq ft, total sqft, approx sqft, approx sq ft, gla, building area, living sqft,
+            heated area, square foot, sf, total sq ft, finished sqft, above grade finished area]
+  weak_aliases: [area, size]
+
+lot_sqft:
+  aliases: [lot size, lot sqft, lot sq ft, lot size sqft, lot area, lot size square feet,
+            lotsizesquarefeet, lot sf, lot size sf]
+
+lot_acres:
+  aliases: [acres, lot acres, lot size acres, lotsizeacres, acreage, lot size acreage]
+
+year_built:
+  aliases: [year built, yr built, built, yearbuilt, year constructed, construction year,
+            year built actual, yr blt]
+  weak_aliases: [year]
+
+list_date:
+  aliases: [list date, listing date, listing contract date, listingcontractdate, on market date,
+            date listed, list dt, on market, listed date, listed on, start date]
+
+showing_requirements:
+  aliases: [showing instructions, showing requirements, showingrequirements, showing info,
+            showing instruction, access instructions, show instructions, show instr,
+            appointment instructions, showing type, showing contact, how to show,
+            showing remarks, access info, showing]
+  weak_aliases: [access, instructions]
