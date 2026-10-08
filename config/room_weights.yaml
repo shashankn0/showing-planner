@@ -1,0 +1,10 @@
+# How much each room type counts toward a listing's overall condition score.
+# Kitchens and baths usually drive buyer perception and renovation cost, so they weigh most.
+# Rooms with no usable photos are skipped and the rest are re-weighted.
+# Set a weight to 0 to ignore a room type. Edit here, or in Settings > Photo scoring.
+kitchen: 3.0
+bath: 2.5
+exterior: 2.0
+living: 1.5
+bedroom: 1.0
+other: 0.5

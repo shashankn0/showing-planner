@@ -1,0 +1,8 @@
+# Optional: photo scoring. Install with:  pip install -r requirements-vision.txt
+# CPU-only PyTorch is plenty for frozen-embedding scoring (a few photos per second).
+# Keep these OUT of the public demo's requirements.txt: they add ~1 GB and a model download.
+-r requirements.txt
+torch==2.14.1
+open_clip_torch==3.3.0
+timm==1.0.30
+scikit-learn==1.9.1

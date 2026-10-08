@@ -47,6 +47,9 @@ class Candidate:
     list_date: date | None = None
     condition: float | None = None  # 1..5 from photo scoring, when available
     condition_photos: int = 0
+    worst_room: str | None = None  # weakest room type among the photos
+    worst_room_score: float | None = None
+    limited_photo_coverage: bool = False  # e.g. no kitchen/bath/exterior photo
     mls: str | None = None
     is_synthetic: bool = False
 
@@ -209,7 +212,12 @@ def _condition(c: Candidate, p: Preferences) -> tuple[float | None, str]:
     good = _clamp((c.condition - 1) / 4)
     # renovation_ok: a project is welcome, but severe damage is still a risk
     score = good if p.condition_mode == "move_in_ready" else 0.3 + 0.7 * (1 - good)
-    return score, f"{c.condition:.1f}/5 from {c.condition_photos} photo(s)"
+    detail = f"{c.condition:.1f}/5 from {c.condition_photos} photo(s)"
+    if c.worst_room and c.worst_room_score is not None and c.worst_room_score <= c.condition - 0.4:
+        detail += f"; weakest: {c.worst_room} {c.worst_room_score:.1f}"
+    if c.limited_photo_coverage:
+        detail += "; limited photo coverage"
+    return score, detail
 
 
 def _age(c: Candidate, p: Preferences) -> tuple[float | None, str]:

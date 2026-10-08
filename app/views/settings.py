@@ -17,6 +17,70 @@ def _size_mb(path: Path) -> float:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file()) / 1e6
 
 
+def _photo_scoring_section(settings) -> None:  # noqa: ANN001
+    from app import vision_services as vs
+    from vision.config import ROOM_LABELS, ROOMS, VisionConfig, load_room_weights, save_room_weights
+    from vision.embedders import deps_available
+    from vision.pipeline import refresh_rollups
+
+    st.subheader("Photo scoring")
+    deps = deps_available()
+    cfg = VisionConfig.load()
+    active = vs.active_model_version(settings)
+    ready = vs.vision_ready()
+    st.dataframe(
+        [
+            {
+                "Item": "Photo model software",
+                "Status": "Installed"
+                if ready
+                else "Not installed (pip install -r requirements-vision.txt)",
+            },
+            {"Item": "Photo model", "Status": cfg.backbone},
+            {"Item": "In use", "Status": active or "Zero-shot baseline (no trained model yet)"},
+            {
+                "Item": "Graphics card",
+                "Status": "Not used: scoring runs on the CPU (plenty for this)"
+                if not deps["torch"]
+                else "CPU unless a CUDA build of PyTorch is installed",
+            },
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+    st.caption(
+        "Change the model in config/vision.yaml. Your labels and trained models stay on this computer."
+    )
+
+    st.markdown("**How much each room counts toward a listing's condition score**")
+    weights = load_room_weights(settings.data_dir)
+    cols = st.columns(len(ROOMS))
+    new = {
+        r: cols[i].number_input(
+            ROOM_LABELS[r].split(" ")[0], 0.0, 10.0, float(weights[r]), step=0.5, key=f"rw_{r}"
+        )
+        for i, r in enumerate(ROOMS)
+    }
+    if st.button("Save room weights and recalculate scores"):
+        save_room_weights(settings.data_dir, new)
+        done = 0
+        for v in {active, *[m["version"] for m in vs.model_versions(settings)]} - {None}:
+            done += refresh_rollups(settings, v)
+        for row in _zero_shot_versions(settings):
+            done += refresh_rollups(settings, row)
+        st.success(f"Saved. Recalculated {done} listing score(s).")
+
+
+def _zero_shot_versions(settings) -> list[str]:  # noqa: ANN001
+    from sqlalchemy import select
+
+    from core.db import session_scope
+    from core.models import ListingScore
+
+    with session_scope(settings) as s:
+        return list(s.scalars(select(ListingScore.model_version).distinct()))
+
+
 def render() -> None:
     settings = context()
     st.title("Settings")
@@ -72,6 +136,8 @@ def render() -> None:
         ),
     ]
     st.dataframe([{"Service": a, "Status": b} for a, b in rows], hide_index=True, width="stretch")
+
+    _photo_scoring_section(settings)
 
     st.subheader("Saved column layouts")
     profiles = load_profiles(settings.mappings_dir)

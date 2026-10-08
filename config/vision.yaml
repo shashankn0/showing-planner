@@ -1,0 +1,22 @@
+# Photo-scoring settings. Edit freely; unknown keys are ignored.
+#
+# backbone: which pretrained model turns a photo into numbers ("embeddings").
+#   openclip:<model>:<pretrained>   language-aware; enables the zero-shot baseline (recommended)
+#   timm:<model>                    vision-only, e.g. timm:vit_small_patch14_dinov2.lvd142m (DINOv2);
+#                                   no zero-shot, but can be trained from your labels
+#   colorhist                       tiny built-in fallback that needs no download (weak; for testing)
+backbone: "openclip:ViT-B-32:laion2b_s34b_b79k"
+
+batch_size: 16
+max_side: 512            # photos are shrunk to this before analysis
+
+# --- automatic exclusion of photos that aren't of the property ---
+junk_threshold: 0.5      # exclude when floor plan / map / logo / etc. gets at least this share
+dedupe_hamming: 4        # near-identical photos: max bit difference of the 64-bit image hash
+min_side_px: 300         # smaller photos are flagged poor quality
+blur_variance_min: 30.0  # sharpness floor (variance of the Laplacian on a 256px copy)
+brightness_range: [35, 235]
+
+# --- training ---
+min_labels_to_train: 40      # below this the app keeps using the zero-shot baseline
+holdout_fraction_denominator: 5   # 1 in 5 photos (by file hash) is a permanent holdout

@@ -37,6 +37,7 @@ from sources.photos import (
 from sources.profiles import save_profile
 from sources.rentcast import Http as RentCastHttp
 from sources.rentcast import RentCastSource
+from vision import registry
 
 NEW_LISTING = "__new__"
 
@@ -248,14 +249,28 @@ def listings_table(settings: Settings) -> pd.DataFrame:
 
 
 def candidates_from_db(settings: Settings) -> list[Candidate]:
-    """Listings reduced to the facts the ranking may use, plus photo condition when scored."""
+    """Listings reduced to the facts the ranking may use, plus photo condition when scored.
+
+    Photo scores come from the active model's version when it has scored a listing, otherwise
+    from the most recent scoring run.
+    """
+    active = registry.active_version(settings.models_dir)
     with session_scope(settings) as s:
-        latest: dict[int, ListingScore] = {}
+        by_listing: dict[int, list[ListingScore]] = {}
         for sc in s.scalars(select(ListingScore).order_by(ListingScore.created_at)):
-            latest[sc.listing_id] = sc
+            by_listing.setdefault(sc.listing_id, []).append(sc)
+
+        def pick(listing_id: int) -> ListingScore | None:
+            rows = by_listing.get(listing_id, [])
+            for r in rows:
+                if active and r.model_version == active:
+                    return r
+            return rows[-1] if rows else None
+
         out = []
         for lst in s.scalars(select(Listing).order_by(Listing.id)):
-            sc = latest.get(lst.id)
+            sc = pick(lst.id)
+            detail = (sc.by_room or {}) if sc else {}
             out.append(
                 Candidate(
                     id=lst.id,
@@ -273,6 +288,9 @@ def candidates_from_db(settings: Settings) -> list[Candidate]:
                     list_date=lst.list_date,
                     condition=sc.overall if sc else None,
                     condition_photos=sc.n_photos_used if sc else 0,
+                    worst_room=sc.worst_room if sc else None,
+                    worst_room_score=sc.worst_room_score if sc else None,
+                    limited_photo_coverage=bool(detail.get("limited_coverage")),
                     mls=lst.source_listing_id,
                     is_synthetic=lst.is_synthetic,
                 )

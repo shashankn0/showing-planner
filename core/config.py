@@ -77,6 +77,14 @@ class Settings:
         return self.data_dir / "mappings"
 
     @property
+    def embeddings_dir(self) -> Path:
+        return self.data_dir / "embeddings"
+
+    @property
+    def models_dir(self) -> Path:
+        return self.data_dir / "models"
+
+    @property
     def prefs_path(self) -> Path:
         return self.data_dir / "settings.yaml"
 
