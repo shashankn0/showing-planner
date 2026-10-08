@@ -270,3 +270,46 @@ Practical constraints, with sources where I have them:
 ```
 
 Build order (each phase ends with tests, an app run, and a 5-line status): **Phase 1** schema + CSV import + geocoding + page skeletons -> **Phase 2** vision MVP + labeling UI + evaluation -> **Phase 3** routing -> **Phase 4** polish, explainability, demo mode with clearly labeled synthetic data.
+
+---
+
+## 10. Addendum (2026-10-08): product direction and hosting
+
+The product is now defined as **preferences in, tier list out** (see [PRODUCT.md](PRODUCT.md)),
+delivered as a website. Research added for that change:
+
+- **Hosting (free, no domain):** Streamlit Community Cloud gives a free `*.streamlit.app` address,
+  sleeps after 12 idle hours, allows up to 2.7 GB RAM and one private app [V:
+  [manage your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app),
+  [share your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app)].
+  Cloudflare quick tunnels need no account or domain but have no uptime guarantee [V:
+  [docs](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)].
+  Render's free tier spins down after 15 min and has no persistent disk [V:
+  [docs](https://render.com/docs/free)]. **Correction to my earlier note:** Hugging Face Spaces for
+  Streamlit/Docker now require a paid plan; only static Spaces are free [V:
+  [Spaces overview](https://huggingface.co/docs/hub/spaces-overview)].
+- **Listing data:** RentCast has a free 50-calls/month plan and documented sale-listing endpoints,
+  but no photo fields in the documented response [V:
+  [RentCast API](https://www.rentcast.io/api),
+  [sale listings](https://developers.rentcast.io/reference/sale-listings)]. Zillow retired its public
+  API and prohibits scraping; MLS feeds need a license [S: [Nordic APIs](https://nordicapis.com/the-6-best-real-estate-apis/)].
+- **Fair housing for schools/crime:** HUD's April 24, 2026 Dear Colleague letter says sharing
+  objective, verifiable school and crime information is not by itself a violation if neutral,
+  consistent and free of discriminatory intent; steering stays prohibited [S: NAR
+  [FAQ](https://www.nar.realtor/fair-housing/faqs-on-steering-crime-and-schools),
+  [Washington Report](https://www.nar.realtor/washington-report/hud-issues-dear-colleague-letter-on-school-and-crime-data);
+  the letter PDF itself would not render for me]. NAR advises giving every client the same verified
+  data and avoiding "good/bad neighborhood" characterizations.
+- **Flood zones:** FEMA's National Flood Hazard Layer is queryable by point through a public REST
+  service [S: search results; endpoint `hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer`,
+  not yet tested here].
+
+### Added decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D14 | Tier list = hard requirements (with reasons) + weighted 0-100 score over an **allowlisted** set of property/client-stated criteria; tiers S/A/B/C/D by fixed cutoffs; "not enough data" instead of a guess when under half the chosen criteria have data | Transparent, explainable, and impossible to extend with a demographic factor by accident (enforced in code and tests) |
+| D15 | **No neighborhood demographics or income, and no neighborhood-quality score**; schools/crime not in the score, possible later only as an opt-in, client-stated, source-cited filter | Steering risk for a licensed agent; HUD/NAR allow neutral, consistent factual sharing but not characterizing areas |
+| D16 | No scraping. Listing sources: files and paste (built), optional licensed API (RentCast: no documented photos), broker-approved FMLS feed | Site terms and the project's own constraints |
+| D17 | Website = the existing Streamlit app, deployed free on Streamlit Community Cloud (public demo / bring-your-own-data) or via a Cloudflare tunnel (your own data, with a password) | Free, no domain, smallest change; a rewrite to a separate frontend adds cost without adding capability yet |
+| D18 | Hosted mode: isolated temp workspace per visitor, stale cleanup, optional password gate, loud warning if exposed without either | A shared database on a public site would leak one visitor's uploads to the next; the host's secrets-to-env behavior is unverified, so the failure mode must be visible |

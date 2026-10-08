@@ -1,17 +1,22 @@
 # Showing Planner
 
-A local-first tool for real estate agents:
+A web app for real estate agents. Tell it what a client wants and it ranks your listings into a
+**tier list (S to D)**, showing the reasons behind every placement:
 
-1. **Photo condition scoring** *(next phase)*: score listing photos for physical condition per
-   photo, per room type, and per listing.
-2. **Showing route planning** *(later phase)*: sequence a day of showings with time windows,
-   service times and optional stops.
+1. **Find Homes**: enter budget, beds/baths, size, places the client drives to, and how they feel
+   about condition; get a tier list with strengths, watch-outs and a score breakdown.
+2. **Photo condition scoring** *(next phase)*: scores listing photos for physical condition and
+   feeds the tiers.
+3. **Showing route planning** *(later phase)*: sequence a day of showings with time windows.
 
-It is **not tied to any MLS**. You can import any spreadsheet or export that has addresses
-(an MLS export, a portal download, a list you made yourself), and photos from any folder or zip.
+It is **not tied to any MLS**: import any spreadsheet or export that has addresses, and photos
+from any folder or zip. It never scrapes listing sites, and tiers never use neighborhood
+demographics. See [docs/PRODUCT.md](docs/PRODUCT.md) for exactly what goes into a tier and why.
 
-> **Status:** Phase 1 (listings, photos, geocoding, app skeleton) is done. Scoring and routing
-> are not built yet; their pages are placeholders.
+> **Status:** listings, photos, geocoding, the tier-list engine, client profiles and hosting
+> protections are built and tested. Photo scoring and routing are not built yet.
+>
+> **Put it online free** (no domain purchase): [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Set up (Windows)
 
@@ -27,6 +32,9 @@ Developers: `pip install -r requirements-dev.txt`, then `pytest` and `ruff check
 
 ## Using it
 
+0. **Find Homes** (the landing page). Once listings are loaded, fill in what the client wants and
+   press *Build tier list*. Save the criteria under a client nickname to reuse them. Listings that
+   miss a must-have (over budget, too few beds...) are listed separately with the reason.
 1. **Listings -> Import a file.** Drop in any CSV, TSV, TXT or Excel (.xlsx) file. The app works
    out which column is which from the headers *and* the values (zip codes, prices, states...).
    Check the preview, fix anything it got wrong, and import. Tick "Remember this layout" and the
