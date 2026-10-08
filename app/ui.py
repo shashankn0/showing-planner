@@ -34,35 +34,59 @@ SESSION_ROOT = Path(tempfile.gettempdir()) / "showing_planner_sessions"
 STALE_AFTER_SECONDS = 2 * 3600
 SWEEP_EVERY_SECONDS = 600
 MAX_PASSWORD_ATTEMPTS = 8  # per browser session
-# Server-wide throttle: a reload gives a fresh session, so per-session limits alone don't stop
-# brute force. Too many failures from anyone locks sign-in for everyone for a while.
-GLOBAL_MAX_FAILURES = 20
-GLOBAL_WINDOW_SECONDS = 900
-GLOBAL_LOCK_SECONDS = 900
+# Per-client throttle: a page reload gives a fresh session, so per-session limits alone don't stop
+# brute force. Failures are counted per client address (as reported by the host's proxy), so one
+# attacker locks only themselves out, not everyone.
+CLIENT_MAX_FAILURES = 20
+CLIENT_WINDOW_SECONDS = 900
+CLIENT_LOCK_SECONDS = 900
+MAX_TRACKED_CLIENTS = 5000  # bound memory if someone sprays many addresses
 
 _last_sweep = 0.0
-_failures: list[float] = []
-_locked_until = 0.0
+_failures: dict[str, list[float]] = {}
+_locked_until: dict[str, float] = {}
 _pause = time.sleep  # replaced in tests
 
 
 def reset_auth_throttle() -> None:
-    global _locked_until  # noqa: PLW0603
     _failures.clear()
-    _locked_until = 0.0
+    _locked_until.clear()
 
 
-def _lock_remaining(now: float) -> float:
-    return max(_locked_until - now, 0.0)
+def _client_key() -> str:
+    """Best available identity of the visitor's network address.
+
+    Behind a proxy (Cloudflare, most hosts) the proxy supplies the real address in a header. With
+    no proxy header all visitors share one key, which is the safe fallback: still brute-force
+    resistant, just not per-person. Headers can be forged when the app is exposed directly with
+    no proxy, so treat this as a speed bump, not authentication.
+    """
+    try:
+        headers = st.context.headers
+        cf = headers.get("CF-Connecting-IP")
+        if cf:
+            return cf.strip()
+        xff = headers.get("X-Forwarded-For")
+        if xff:
+            return xff.split(",")[-1].strip()  # the hop our own proxy appended
+    except Exception:  # noqa: BLE001
+        pass
+    return "direct"
 
 
-def _note_failure(now: float) -> None:
-    global _locked_until  # noqa: PLW0603
-    _failures[:] = [t for t in _failures if now - t < GLOBAL_WINDOW_SECONDS]
-    _failures.append(now)
-    if len(_failures) >= GLOBAL_MAX_FAILURES:
-        _locked_until = now + GLOBAL_LOCK_SECONDS
-        _failures.clear()
+def _lock_remaining(now: float, key: str) -> float:
+    return max(_locked_until.get(key, 0.0) - now, 0.0)
+
+
+def _note_failure(now: float, key: str) -> None:
+    if len(_failures) >= MAX_TRACKED_CLIENTS and key not in _failures:
+        _failures.clear()  # shed old state rather than grow without bound
+    recent = [t for t in _failures.get(key, []) if now - t < CLIENT_WINDOW_SECONDS]
+    recent.append(now)
+    _failures[key] = recent
+    if len(recent) >= CLIENT_MAX_FAILURES:
+        _locked_until[key] = now + CLIENT_LOCK_SECONDS
+        _failures.pop(key, None)
 
 
 def _sweep_stale_workspaces(now: float | None = None) -> None:
@@ -200,7 +224,8 @@ def password_ok(settings: Settings) -> bool:
     if st.session_state.get("_authed"):
         return True
     st.title("Showing Planner")
-    remaining = _lock_remaining(time.monotonic())
+    client = _client_key()
+    remaining = _lock_remaining(time.monotonic(), client)
     if remaining > 0:
         st.error(
             f"Too many failed sign-ins. Try again in about {math.ceil(remaining / 60)} minute(s)."
@@ -216,10 +241,13 @@ def password_ok(settings: Settings) -> bool:
             if hmac.compare_digest(pw.encode(), settings.app_password.encode()):
                 st.session_state["_authed"] = True
                 st.rerun()
-            _note_failure(time.monotonic())
+            _note_failure(time.monotonic(), client)
             _pause(min(0.25 * 2**attempts, 4.0))  # each wrong guess costs more time
             st.session_state["_attempts"] = attempts + 1
-            if attempts + 1 >= MAX_PASSWORD_ATTEMPTS or _lock_remaining(time.monotonic()) > 0:
+            if (
+                attempts + 1 >= MAX_PASSWORD_ATTEMPTS
+                or _lock_remaining(time.monotonic(), client) > 0
+            ):
                 st.rerun()  # show the lockout message right away
             st.error("That password isn't right.")
     return False

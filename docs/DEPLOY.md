@@ -27,9 +27,10 @@ Spaces need a paid plan; only static Spaces are free [V]. GitHub Pages can't run
 3. **Keys go in the host's Secrets**, never in the repo. `.gitignore` already excludes `data/`,
    `.env` and databases.
 4. The password gate (`APP_PASSWORD`) slows guessing (8 tries per page load, a growing delay after
-   each wrong guess, and a server-wide lock of 15 minutes after 20 failures from anyone) but it is
-   not strong authentication, and a determined attacker could lock everyone out for a while.
-   Use a long passphrase. For real confidentiality use Community Cloud's private app with an
+   each wrong guess, and a 15-minute lock after 20 failures from the same client address, so one
+   attacker can't lock out everyone) but it is not strong authentication; client addresses come
+   from the host's proxy headers and can be forged if the app is exposed directly. Use a long
+   passphrase. For real confidentiality use Community Cloud's private app with an
    email viewer list.
 
 ## Option A: Streamlit Community Cloud, step by step

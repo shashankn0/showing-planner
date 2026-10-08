@@ -274,24 +274,53 @@ def test_secrets_can_turn_on_hosted_mode(settings, monkeypatch):
 # ------------------------------------------------------------------ review follow-ups
 
 
-def test_failures_across_sessions_lock_sign_in_server_wide(settings, monkeypatch):
+def test_one_clients_failures_lock_only_that_client(settings, monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "open-sesame")
-    # many different visitors (fresh sessions) each guess wrong a few times
-    for _ in range(ui.GLOBAL_MAX_FAILURES // 4):
+    monkeypatch.setattr(ui, "_client_key", lambda: "203.0.113.7")  # the attacker
+    # the attacker keeps reloading (fresh sessions) and guessing
+    for _ in range(ui.CLIENT_MAX_FAILURES // 4):
         at = AppTest.from_file(MAIN, default_timeout=30).run()
         for _ in range(4):
             at.text_input[0].set_value("guess")
             at.button[0].click().run()
-    # a brand-new session is now locked out, even with the right password
-    fresh = AppTest.from_file(MAIN, default_timeout=30).run()
-    assert any("Too many failed sign-ins" in e.value for e in fresh.error)
-    assert not fresh.text_input  # no form to type into
-    # after the lock expires, sign-in works again
-    monkeypatch.setattr(ui, "_locked_until", 0.0)
+    locked = AppTest.from_file(MAIN, default_timeout=30).run()
+    assert any("Too many failed sign-ins" in e.value for e in locked.error)
+    assert not locked.text_input  # no form to type into, even for the right password
+
+    # a different visitor is unaffected and can sign in
+    monkeypatch.setattr(ui, "_client_key", lambda: "198.51.100.20")
+    other = AppTest.from_file(MAIN, default_timeout=30).run()
+    other.text_input[0].set_value("open-sesame")
+    other.button[0].click().run()
+    assert any("Find Homes" in t.value for t in other.title)
+
+    # the attacker is released once their lock expires
+    ui._locked_until["203.0.113.7"] = 0.0
+    monkeypatch.setattr(ui, "_client_key", lambda: "203.0.113.7")
     again = AppTest.from_file(MAIN, default_timeout=30).run()
-    again.text_input[0].set_value("open-sesame")
-    again.button[0].click().run()
-    assert any("Find Homes" in t.value for t in again.title)
+    assert again.text_input
+
+
+def test_client_key_prefers_proxy_headers(monkeypatch):
+    class H(dict):
+        def get(self, k, d=None):
+            return super().get(k, d)
+
+    class Ctx:
+        headers = H({"CF-Connecting-IP": "198.51.100.9", "X-Forwarded-For": "1.1.1.1, 2.2.2.2"})
+
+    monkeypatch.setattr(ui.st, "context", Ctx())
+    assert ui._client_key() == "198.51.100.9"
+    Ctx.headers = H({"X-Forwarded-For": "6.6.6.6, 2.2.2.2"})  # last hop is the trusted proxy's
+    assert ui._client_key() == "2.2.2.2"
+    Ctx.headers = H({})
+    assert ui._client_key() == "direct"
+
+
+def test_throttle_state_stays_bounded(monkeypatch):
+    for i in range(ui.MAX_TRACKED_CLIENTS + 50):
+        ui._note_failure(1000.0, f"10.0.{i // 250}.{i % 250}")
+    assert len(ui._failures) <= ui.MAX_TRACKED_CLIENTS
 
 
 def test_each_wrong_guess_adds_a_delay(settings, monkeypatch):
