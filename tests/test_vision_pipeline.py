@@ -420,3 +420,58 @@ def test_flat_images_are_not_mistaken_for_duplicates_of_each_other(settings, tmp
         )
     rep = score_photos(settings, runtime_for(settings, clip))
     assert rep.excluded_duplicates == 0
+
+
+def test_rescanned_copies_are_caught_by_hash_plus_embedding_but_other_views_are_not(
+    settings, tmp_path, clip
+):
+    """Re-encoded copies of one photo (contrast shifted) differ by a few hash bits; a different
+    photo of a similar-colored scene must not be swallowed."""
+    base = noisy_color(RED, 21)
+    rescanned = base.point(lambda v: int(np.clip((v - 128) * 1.25 + 128, 0, 255)))  # more contrast
+    other_view = noisy_color(RED, 22)  # same "kitchen" color, different structure
+    with session_scope(settings) as s:
+        upsert_listings(s, [RawListing("manual", "7 Scan St", "Testville", "GA", "30301")])
+        listing = s.scalar(select(Listing))
+        files = [save(base, tmp_path / "a.jpg"), save(rescanned.resize((400, 300)), tmp_path / "b.jpg"),
+                 save(other_view, tmp_path / "c.jpg")]  # fmt: skip
+        ingest_photos(s, settings, listing, files)
+    rep = score_photos(settings, runtime_for(settings, clip))
+    with session_scope(settings) as s:
+        excluded = [p for p in s.scalars(select(Photo)) if p.excluded]
+    assert rep.excluded_duplicates == len(excluded) == 1
+    assert excluded[0].path.endswith("b.jpg") or excluded[0].width == 400  # the smaller re-scan
+
+
+def test_loose_hash_match_alone_is_not_enough():
+    from types import SimpleNamespace
+
+    from vision.pipeline import _cluster_duplicates
+
+    cfg = VisionConfig()
+    a = SimpleNamespace(
+        id=1,
+        phash="0000000000000000",
+        width=800,
+        height=600,
+        order_idx=0,
+        excluded=False,
+        exclude_reason=None,
+    )
+    b = SimpleNamespace(
+        id=2,
+        phash="00000000000000ff",
+        width=640,
+        height=480,
+        order_idx=1,
+        excluded=False,
+        exclude_reason=None,
+    )  # 8 bits apart
+    unit = lambda v: np.array(v, dtype=np.float32) / np.linalg.norm(v)  # noqa: E731
+    far = {1: unit([1, 0, 0]), 2: unit([0.6, 0.8, 0])}  # different scene
+    near = {1: unit([1, 0, 0]), 2: unit([0.99, 0.05, 0])}  # same scene
+    assert _cluster_duplicates([a, b], cfg, lambda p: far[p.id]) == []
+    assert [(d.id, k.id) for d, k in _cluster_duplicates([a, b], cfg, lambda p: near[p.id])] == [
+        (2, 1)
+    ]
+    assert _cluster_duplicates([a, b], cfg, lambda p: None) == []  # no embedding: stay cautious

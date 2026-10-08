@@ -285,6 +285,14 @@ def password_ok(settings: Settings) -> bool:
     return False
 
 
+def md(text: object) -> str:
+    """Make dynamic text safe for st.markdown / st.caption.
+
+    Streamlit renders text between two dollar signs as a math formula, so "$478,000 ... the
+    $495,000 target" came out garbled. Escape them."""
+    return str(text).replace("$", r"\$")
+
+
 def disclaimer() -> None:
     st.caption(f"⚖️ {DISCLAIMER}")
 

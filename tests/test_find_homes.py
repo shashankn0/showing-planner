@@ -403,3 +403,28 @@ def test_workspace_sweep_runs_at_most_every_ten_minutes(hosted):
     ui._last_sweep = time.time() - 3600
     ui._sweep_stale_workspaces()
     assert not old.exists()
+
+
+# ------------------------------------------------------------------ dollar signs in markdown
+
+
+def test_md_escapes_dollar_signs_so_two_prices_are_not_rendered_as_math():
+    assert (
+        ui.md("$478,000, at or under the $495,000 target")
+        == r"\$478,000, at or under the \$495,000 target"
+    )
+    assert ui.md(None) == "None" and ui.md("no money here") == "no money here"
+
+
+def test_tier_cards_escape_prices_in_every_dynamic_line(seeded):
+    at = AppTest.from_string(PAGE, default_timeout=30).run()
+    at.number_input(key="c0_maxp").set_value(520_000)
+    at.number_input(key="c0_tgt").set_value(420_000)
+    at.number_input(key="c0_beds").set_value(2)
+    at.button[0].click().run()
+    assert not at.exception, at.exception
+    texts = [m.value for m in at.markdown] + [c.value for c in at.caption]
+    dollar_lines = [t for t in texts if "$" in t and "Tier" not in t[:8] and "badge" not in t]
+    assert dollar_lines, "expected cards that mention prices"
+    for t in dollar_lines:
+        assert t.count("$") == t.count("\\$"), f"unescaped dollar sign: {t}"

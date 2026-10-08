@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from app import services
-from app.ui import context, disclaimer, thumbnail
+from app.ui import context, disclaimer, md, thumbnail
 from app.views.listings import demo_button
 from ranking.engine import Ranked, RankingResult
 from ranking.preferences import (
@@ -284,7 +284,7 @@ def _show(settings, result: RankingResult, prefs: Preferences) -> None:  # noqa:
     if excluded:
         with st.expander(f"Not considered ({len(excluded)}): didn't meet a must-have"):
             for r in excluded:
-                st.markdown(f"**{r.candidate.address}**: " + "; ".join(r.excluded_reasons))
+                st.markdown(md(f"**{r.candidate.address}**: " + "; ".join(r.excluded_reasons)))
 
 
 def _card(settings, r: Ranked, photo) -> None:  # noqa: ANN001
@@ -300,7 +300,7 @@ def _card(settings, r: Ranked, photo) -> None:  # noqa: ANN001
                 thumb = thumbnail(settings, photo, 360)
                 if thumb:
                     st.image(str(thumb), width="stretch")
-            st.markdown(f"**{c.address}**")
+            st.markdown(md(f"**{c.address}**"))
             facts = [
                 f"${c.price:,}" if c.price else None,
                 f"{c.beds} bd" if c.beds is not None else None,
@@ -308,15 +308,15 @@ def _card(settings, r: Ranked, photo) -> None:  # noqa: ANN001
                 f"{c.sqft:,} sq ft" if c.sqft else None,
             ]
             st.caption(
-                " · ".join(f for f in facts if f) + (" · demo data" if c.is_synthetic else "")
+                md(" · ".join(f for f in facts if f) + (" · demo data" if c.is_synthetic else ""))
             )
         with right:
             for s in r.strengths:
-                st.markdown(f"✅ {s}")
+                st.markdown(md(f"✅ {s}"))
             for w in r.watchouts:
-                st.markdown(f"⚠️ {w}")
+                st.markdown(md(f"⚠️ {w}"))
             for u in r.unknowns:
-                st.caption(f"ℹ️ {u}")
+                st.caption(md(f"ℹ️ {u}"))
         with st.expander("Score breakdown"):
             st.dataframe(
                 [

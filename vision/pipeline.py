@@ -56,14 +56,34 @@ def _clear_auto_exclusions(photos: list[Photo]) -> None:
             p.excluded, p.exclude_reason = False, None
 
 
-def _cluster_duplicates(photos: list[Photo], max_bits: int) -> list[tuple[Photo, Photo]]:
-    """(duplicate, kept) pairs among a listing's photos; keeps the highest-resolution one."""
+def _cluster_duplicates(
+    photos: list[Photo],
+    cfg,
+    embedding_of: Callable[[Photo], np.ndarray | None],  # noqa: ANN001
+) -> list[tuple[Photo, Photo]]:
+    """(duplicate, kept) pairs among a listing's photos; keeps the highest-resolution one.
+
+    Two photos are duplicates if their image hashes are nearly identical, or if the hashes are
+    fairly close AND the model embeddings are almost the same. (Re-scans or re-crops of one photo
+    differ by 5 to 9 hash bits but share embeddings above 0.97, while different rooms sit around
+    0.6 to 0.7.)
+    """
+
+    def same(a: Photo, b: Photo) -> bool:
+        bits = hamming_hex(a.phash, b.phash)
+        if bits <= cfg.dedupe_hamming:
+            return True
+        if bits <= cfg.dedupe_hamming_loose:
+            va, vb = embedding_of(a), embedding_of(b)
+            return va is not None and vb is not None and float(va @ vb) >= cfg.dedupe_cosine
+        return False
+
     pool = [p for p in photos if p.phash and not p.excluded]
     pool.sort(key=lambda p: (-(p.width or 0) * (p.height or 0), p.order_idx, p.id))
     kept: list[Photo] = []
     dupes = []
     for p in pool:
-        match = next((k for k in kept if hamming_hex(p.phash, k.phash) <= max_bits), None)
+        match = next((k for k in kept if same(p, k)), None)
         if match is None:
             kept.append(p)
         elif p.exclude_reason != REASON_KEEP:
@@ -193,7 +213,7 @@ def score_photos(
         for p in photos:
             by_listing.setdefault(p.listing_id, []).append(p)
         for group in by_listing.values():
-            for dup, kept in _cluster_duplicates(group, cfg.dedupe_hamming):
+            for dup, kept in _cluster_duplicates(group, cfg, lambda p: runtime.store.get(p.sha256)):
                 dup.excluded, dup.exclude_reason = (
                     True,
                     f"{REASON_AUTO_PREFIX}duplicate of photo #{kept.id}",

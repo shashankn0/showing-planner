@@ -27,7 +27,8 @@ if not password_ok(_settings):
     st.stop()
 
 pages = [
-    st.Page(find_homes.render, title="Find Homes", icon="🏆", url_path="find-homes", default=True),
+    # the default page is served at the site root; a custom url_path there gives "Page not found"
+    st.Page(find_homes.render, title="Find Homes", icon="🏆", default=True),
     st.Page(listings.render, title="Listings", icon="🏘️", url_path="listings"),
     st.Page(photo_review.render, title="Photo Review", icon="🖼️", url_path="photo-review"),
     st.Page(labeling.render, title="Labeling", icon="🏷️", url_path="labeling"),

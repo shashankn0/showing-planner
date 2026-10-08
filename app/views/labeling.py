@@ -65,14 +65,21 @@ KEYBOARD_JS = """
   document.addEventListener("keydown", function (ev) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
     const t = ev.target, tag = (t.tagName || "").toLowerCase();
-    if (tag === "input" || tag === "textarea" || tag === "select" || t.isContentEditable) return;
+    // Ignore typing in text boxes, but NOT focus left on a radio/checkbox/button by an earlier
+    // shortcut (the browser moves focus there when we click it).
+    const kind = (t.type || "").toLowerCase();
+    const textual = tag === "input" && !["checkbox", "radio", "button", "submit"].includes(kind);
+    if (textual || tag === "textarea" || tag === "select" || t.isContentEditable) return;
     const token = MAP[ev.key.toLowerCase()];
     if (!token) return;
     const needle = "[" + token + "]";
     for (const el of document.querySelectorAll("button, label")) {
       if ((el.innerText || el.textContent || "").includes(needle)) {
         ev.preventDefault();
-        el.click();
+        // Streamlit checkboxes and radios ignore a scripted click on the label element;
+        // clicking the real input inside it is what works.
+        const input = el.tagName === "LABEL" ? el.querySelector("input") : null;
+        (input || el).click();
         return;
       }
     }

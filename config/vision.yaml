@@ -13,6 +13,8 @@ max_side: 512            # photos are shrunk to this before analysis
 # --- automatic exclusion of photos that aren't of the property ---
 junk_threshold: 0.5      # exclude when floor plan / map / logo / etc. gets at least this share
 dedupe_hamming: 4        # near-identical photos: max bit difference of the 64-bit image hash
+dedupe_hamming_loose: 12 # re-scans / re-crops of one photo differ by more bits...
+dedupe_cosine: 0.93      # ...so a loose hash match must ALSO have embeddings this similar
 min_side_px: 300         # smaller photos are flagged poor quality
 blur_variance_min: 30.0  # sharpness floor (variance of the Laplacian on a 256px copy)
 brightness_range: [35, 235]

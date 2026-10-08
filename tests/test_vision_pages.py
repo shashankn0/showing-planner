@@ -244,3 +244,14 @@ def test_photo_scores_flow_into_the_tier_list_with_weakest_room(seeded):
     cond = next(f for f in r.factors if f.key == "condition")
     assert cond.score is not None
     assert "weakest: kitchen" in cond.detail and "limited photo coverage" in cond.detail
+
+
+def test_keyboard_script_has_no_html_like_text():
+    """Streamlit silently skips a script whose body contains angle brackets (found in a real
+    browser: a comment mentioning an input tag stopped every shortcut from working)."""
+    from app.views.labeling import KEYBOARD_JS
+
+    body = KEYBOARD_JS.strip()
+    assert body.startswith("<script>") and body.endswith("</script>")
+    inner = body[len("<script>") : -len("</script>")]
+    assert "<" not in inner and ">" not in inner.replace("=>", "")

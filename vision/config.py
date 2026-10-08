@@ -60,7 +60,9 @@ class VisionConfig:
     batch_size: int = 16
     max_side: int = 512
     junk_threshold: float = 0.5
-    dedupe_hamming: int = 4
+    dedupe_hamming: int = 4  # near-identical image hash: duplicate on its own
+    dedupe_hamming_loose: int = 12  # looser hash match: needs near-identical embeddings too
+    dedupe_cosine: float = 0.93
     min_side_px: int = 300
     blur_variance_min: float = 30.0
     brightness_range: tuple[float, float] = (35.0, 235.0)
