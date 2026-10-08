@@ -11,6 +11,7 @@ from sources.addresses import (
     ParsedAddress,
     clean,
     compose_street,
+    is_plausible_street,
     normalize_state,
     normalize_zip,
     parse_full_address,
@@ -147,13 +148,12 @@ class CsvImportSource(ListingSource):
             street, unit = split_unit(street)
         unit = clean(g("unit")).upper() or unit
 
-        if not street or len(street.strip()) < 3:
-            self.skipped.append((n, "no street address"))
-            return None
-
         city = clean(g("city")) or parsed.city
         state = normalize_state(g("state")) or parsed.state
         zip_ = normalize_zip(g("postal_code")) or parsed.postal_code
+        if not is_plausible_street(street, city, state, zip_):
+            self.skipped.append((n, "no street address"))
+            return None
         assumed = False
         if not state and self.prefs.default_state:
             state, assumed = normalize_state(self.prefs.default_state), True

@@ -223,3 +223,15 @@ def address_key(
 def street_tokens(text: str) -> set[str]:
     """Tokens used to match folder/file names to addresses."""
     return {t for t in normalize_street(text).replace("-", " ").split() if t}
+
+
+def is_plausible_street(street: str | None, *context_parts: object) -> bool:
+    """Reject junk like 'hello' or 'N/A' without rejecting 'Peachtree Rd, Atlanta' (vacant land).
+
+    A street is plausible if it has a house number, or the row also names a city/state/ZIP that
+    came from the data itself (not from Settings defaults).
+    """
+    st = clean(street)
+    if len(st) < 3:
+        return False
+    return bool(re.search(r"\d", st)) or any(clean(c) for c in context_parts)

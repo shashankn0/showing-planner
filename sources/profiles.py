@@ -71,3 +71,11 @@ def find_profile(
         ):
             best, best_sim = prof, sim
     return best
+
+
+def delete_profile(directory: Path, name: str) -> bool:
+    path = directory / f"{_slug(name)}.yaml"
+    if path.exists():
+        path.unlink()
+        return True
+    return False

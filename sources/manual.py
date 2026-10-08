@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 
 from core.config import UserPrefs
-from sources.addresses import parse_full_address
+from sources.addresses import is_plausible_street, normalize_state, parse_full_address
 from sources.base import ListingSource, RawListing
 from sources.values import classify_access, parse_price, redact_access_codes, to_int
 
@@ -33,22 +33,29 @@ class ManualEntrySource(ListingSource):
     def fetch(self) -> Iterator[RawListing]:
         self.skipped = []
         for line in self.addresses:
-            parsed = parse_full_address(line, self.prefs.default_city, self.prefs.default_state)
-            if not parsed.has_street:
+            parsed = parse_full_address(line)
+            if not is_plausible_street(
+                parsed.street, parsed.city, parsed.state, parsed.postal_code
+            ):
                 self.skipped.append(line)
                 continue
             yield RawListing(
                 source=self.name,
                 street=parsed.street or "",
                 unit=parsed.unit,
-                city=parsed.city,
-                state=parsed.state,
+                city=parsed.city or self.prefs.default_city or None,
+                state=parsed.state or normalize_state(self.prefs.default_state),
                 postal_code=parsed.postal_code,
             )
         for rec in self.records:
             addr = rec.get("address") or rec.get("street") or ""
-            parsed = parse_full_address(addr, self.prefs.default_city, self.prefs.default_state)
-            if not parsed.has_street:
+            parsed = parse_full_address(addr)
+            if not is_plausible_street(
+                parsed.street,
+                parsed.city or rec.get("city"),
+                parsed.state or rec.get("state"),
+                parsed.postal_code or rec.get("postal_code"),
+            ):
                 self.skipped.append(str(addr))
                 continue
             showing = redact_access_codes(rec.get("showing_requirements"))
@@ -56,8 +63,8 @@ class ManualEntrySource(ListingSource):
                 source=self.name,
                 street=parsed.street or "",
                 unit=rec.get("unit") or parsed.unit,
-                city=rec.get("city") or parsed.city,
-                state=rec.get("state") or parsed.state,
+                city=rec.get("city") or parsed.city or self.prefs.default_city or None,
+                state=rec.get("state") or parsed.state or normalize_state(self.prefs.default_state),
                 postal_code=rec.get("postal_code") or parsed.postal_code,
                 source_listing_id=(
                     str(rec["source_listing_id"]).strip().upper()

@@ -22,7 +22,7 @@ Researched 2026-10-08. Every claim carries a status tag:
 ### 1.1 What you can do today, as a member
 
 - FMLS runs on Matrix. [S: [FMLS Matrix page](https://firstmls.com/technology/matrix)]
-- Matrix has **Custom Exports**: Settings -> Custom Exports -> Add Export, pick fields from "Available Fields", CSV with comma or tab. Then run a search, select listings, click Export, and choose your template. [S: these are other MLSs' help pages for the same Matrix product: [CRMLS](https://kb.crmls.org/knowledgebase/matrix-how-to-create-a-custom-export), [SmartMLS](https://matrix.smartmls.com/hc/en-us/articles/13118336768283-Create-Custom-Export-Excel)]. **FMLS's exact field list and UI may differ, so I need your CSV header row (section 8).**
+- Matrix has **Custom Exports**: Settings -> Custom Exports -> Add Export, pick fields from "Available Fields", CSV with comma or tab. Then run a search, select listings, click Export, and choose your template. [S: these are other MLSs' help pages for the same Matrix product: [CRMLS](https://kb.crmls.org/knowledgebase/matrix-how-to-create-a-custom-export), [SmartMLS](https://matrix.smartmls.com/hc/en-us/articles/13118336768283-Create-Custom-Export-Excel)]. FMLS's exact field list and UI may differ, so **the importer does not depend on any one layout** (see D1 and `sources/columns.py`): it auto-detects columns from header synonyms plus what the values look like, and any export with an address will import.
 - **Photos: [?]** I found no evidence that Matrix offers a bulk photo download for listings you don't own; the "Download Photos" hits were tour-vendor tools. Day-one design: you place photos in `data/photos/<MLS#>/`. Whether you may save them is a broker question (1.3).
 - Matrix cannot export agent information. [S: CRMLS KB above] Not needed for this project.
 
@@ -232,7 +232,7 @@ Practical constraints, with sources where I have them:
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | `ListingSource` interface; ship `CsvImportSource` (YAML column map) and `ManualEntrySource`; `ResoWebApiSource` is a documented stub | No scraping; Matrix export is the only path you control today |
+| D1 | `ListingSource` interface; ship `CsvImportSource` with **layout auto-detection** (no fixed template; synonyms in `config/column_aliases.yaml`, value-pattern checks, confirm/override in the UI, remembered layouts) and `ManualEntrySource`; `ResoWebApiSource` is a documented stub. *Revised after review: the tool must work as a universal product, not only for one MLS template.* | No scraping; works with any export that has an address, so it needs no sample file and is usable by any agent |
 | D2 | Vision MVP = zero-shot baseline + **frozen embeddings + small ordinal head** (ridge+thresholds vs CORN, chosen by CV) | No labeled data, limited GPU; embeddings cache; retrains in seconds |
 | D3 | Embedder interface with OpenCLIP/SigLIP and DINOv2 backends; bake-off on first ~150 labels | Literature doesn't settle it for this task; cheap to test |
 | D4 | Fine-tuning deferred until >~1,500 labels and a still-falling learning curve | Overfit risk at 300-500 labels |
@@ -257,7 +257,7 @@ Practical constraints, with sources where I have them:
                                    |
    core/   SQLite (data/app.db): listings, photos, photo_scores, listing_scores, labels,
            agents, clients, showings, routes, route_stops, travel_time_cache, geocode_cache
-           config (.env + YAML column map + room weights), geocoding w/ cache, logging
+           config (.env + column aliases + saved layouts + room weights), geocoding w/ cache, logging
                     |                                          |
    vision/  preprocess (EXIF, resize, pHash dedupe, junk filter)      routing/  travel providers + cache
             -> Embedder (OpenCLIP | DINOv2, disk cache)                         priority.py  (client rank,

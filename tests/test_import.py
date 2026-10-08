@@ -379,3 +379,10 @@ def test_handmade_sheet_with_shorthand_prices():
     got = list(CsvImportSource.from_analysis(a).fetch())
     assert [g.list_price for g in got] == [325_000, 215_500, 489_900]
     assert got[0].state == "GA" and got[0].postal_code == "30301"
+
+
+def test_junk_text_is_not_accepted_as_an_address():
+    src = ManualEntrySource.from_text("hello\nN/A\n12 Sample Rd\nPeachtree Rd, Atlanta, GA\n")
+    got = list(src.fetch())
+    assert [g.street for g in got] == ["12 Sample Rd", "Peachtree Rd"]
+    assert len(src.skipped) == 2
