@@ -19,7 +19,8 @@ demographics. See [docs/PRODUCT.md](docs/PRODUCT.md) for exactly what goes into 
 > real-browser suite). Route planning is not built yet. Photo scoring has been run on real
 > photos only as a small smoke test; its accuracy on *your* photos is unknown until you label some.
 >
-> **Put it online free** (no domain purchase): [docs/DEPLOY.md](docs/DEPLOY.md).
+> **Put the code on GitHub:** [docs/GITHUB.md](docs/GITHUB.md). **Put the site online free** (no domain
+> purchase): [docs/DEPLOY.md](docs/DEPLOY.md).
 >
 > **Try it instantly:** on Find Homes click *Try it with demo listings* (synthetic data).
 > **Search real listings:** Listings > Search (RentCast) with your own key; no scraping.

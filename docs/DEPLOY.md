@@ -41,7 +41,7 @@ Spaces need a paid plan; only static Spaces are free [V]. GitHub Pages can't run
    cd C:\Users\snell\showing-planner
    git ls-files | Select-String -Pattern "^data/|\.env$|\.db$"     # should print nothing
    ```
-2. **Create a GitHub repository.** On github.com: *New repository*, name it `showing-planner`.
+2. **Create a GitHub repository** (the full walkthrough, including naming and pushing, is in [GITHUB.md](GITHUB.md)). On github.com: *New repository*, name it `showing-planner`.
    Public is simplest. (Private may work if you authorize Streamlit's GitHub app for private
    repos; I couldn't confirm that in the docs [?].) Don't add a README or .gitignore there.
 3. **Push the code:**
