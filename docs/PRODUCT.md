@@ -56,22 +56,49 @@ enough data" instead of showing a falsely precise score.
 |---|---|---|
 | Your own export or any spreadsheet | Built | Auto-detected layout; the free, fully compliant default |
 | Paste addresses / photo folders | Built | |
-| RentCast API | Option | Free plan = 50 calls/month; paid from $74/mo. Sale listings, prices, days on market. **Its documented listing fields include no photos**, so it can't feed photo analysis by itself |
+| RentCast API | **Built** (Listings > Search) | Bring your own key. Free plan = 50 calls/month; paid from $74/mo. Sale listings, prices, days on market. **Its documented listing fields include no photos**, so those listings have none unless you add photos. Each search uses one call and repeats within 6 hours reuse the saved result |
 | FMLS / Bridge licensed feed | Needs broker | Includes photos; requires a data license (see `RESO_WEB_API.md`) |
 
-## Decisions that are yours
+## Decisions made (2026-10-08)
 
-1. **Who uses the website?** Only you (private link, your real data stays on your PC), or a public
-   site anyone can try with their own uploads (no MLS data stored on the server)?
-2. **Listing source:** keep to file uploads for now, add RentCast for search by city/ZIP/criteria
-   (and bring your own photos), or wait for a broker-approved FMLS feed?
-3. **Schools:** leave them out of tiers (current), or build the opt-in, source-cited filter after
-   you've checked with your broker?
+1. **Audience: a public demo anyone can try.** Hosted mode gives every visitor an isolated
+   temporary workspace; a "Try it with demo listings" button loads clearly-labeled synthetic
+   listings so nobody has to upload anything first. No MLS data is stored on the server.
+2. **Listing source: RentCast search**, with each user bringing their own key. RentCast's API terms
+   say a key may not be shared with others for their own use and the key holder is liable for
+   overage charges, so the public site never uses the owner's key: it is typed by the visitor,
+   held only for their session, sent only to RentCast, and never saved (tests check the key is
+   not on disk). Storing and displaying the data is permitted by their terms.
+3. **Schools: opt-in filter requested, but not built yet** (see below).
+
+### Why the school filter isn't built
+
+A filter like "only homes zoned to a school the state rates at X or better" needs two things:
+which school an address is zoned to, and an official rating. I looked for a verified, current,
+free source and didn't find one:
+
+- **Zoning:** the only nationwide attendance-boundary dataset (NCES SABS) covers just the
+  2013-14 and 2015-16 school years and was an experimental survey that has ended. Boundaries
+  change, so it would give wrong answers. [S: [NCES EDGE SABS](https://nces.ed.gov/programs/edge/SABS)]
+- **Ratings:** I found no confirmed bulk download or API for Georgia's CCRPI scores (GOSA publishes
+  school reports). [S: search results; unverified]
+- **Commercial ratings are a known problem:** analyses of GreatSchools' 1-10 ratings found they
+  track school demographics (schools with the most low-income and Black and Hispanic students
+  averaged 4 to 6 points lower), and that they nudge families toward whiter, more affluent
+  schools. Zillow removed the color-coding for that reason. [S:
+  [Chalkbeat](https://www.chalkbeat.org/posts/us/2019/12/05/greatschools-ratings-poverty-race-segregation-housing/),
+  [Inman](https://www.inman.com/2016/12/20/zillow-wipes-colors-school-ratings-media-coverage/)]
+  I would not use them in a tier.
+
+Building it responsibly means: (a) picking the school districts you actually work in, using each
+district's own published zone map or GIS layer, (b) taking ratings only from the state's official
+report card, with the source shown, and (c) your broker's sign-off. Tell me which districts you
+cover and I can scope it. Until then no school data enters any score.
 
 ## Roadmap
 
 1. **Done:** import any listing file, photos, geocoding, preference-driven tier list, client
-   profiles, hosting protections.
+   profiles, hosting protections, demo listings, RentCast search (bring your own key).
 2. **Next:** photo condition scoring (zero-shot baseline, then your labels train a small ordinal
    model) feeding the "condition" criterion.
 3. Then: real drive times (OpenRouteService) and flood zones; optional listing API; route planner

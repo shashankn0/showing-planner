@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -19,6 +21,7 @@ from ranking.engine import Candidate, RankingResult, rank
 from ranking.preferences import Destination, Preferences
 from sources.base import RawListing
 from sources.csv_import import CsvImportSource, ImportAnalysis
+from sources.demo import demo_listings
 from sources.manual import ManualEntrySource
 from sources.photos import (
     IngestResult,
@@ -31,6 +34,8 @@ from sources.photos import (
     scan_photo_folder,
 )
 from sources.profiles import save_profile
+from sources.rentcast import Http as RentCastHttp
+from sources.rentcast import RentCastSource
 
 NEW_LISTING = "__new__"
 
@@ -370,3 +375,93 @@ def ranking_table(result: RankingResult) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------------------ demo data and RentCast search
+
+RENTCAST_CACHE_SECONDS = 6 * 3600
+
+
+def load_demo_listings(settings: Settings, n: int = 36) -> ImportSummary:
+    """Add clearly-labeled synthetic listings so anyone can try the app with no data."""
+    summary = ImportSummary()
+    with session_scope(settings) as s:
+        batch = ImportBatch(source="demo", filename="demo listings", rows_total=n)
+        s.add(batch)
+        s.flush()
+        res = upsert_listings(s, demo_listings(n), batch)
+    summary.new, summary.updated, summary.listing_ids = res.new, res.updated, res.listing_ids
+    return summary
+
+
+@dataclass
+class RentCastResult:
+    summary: ImportSummary
+    fetched: int
+    from_cache: bool
+    cache_age_minutes: int = 0
+    skipped: int = 0
+
+
+def _rentcast_cache_path(settings: Settings, params: dict) -> Path:
+    key = hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest()[:24]
+    return settings.data_dir / "cache" / f"rentcast_{key}.json"
+
+
+def rentcast_search(
+    settings: Settings,
+    api_key: str,
+    *,
+    city: str | None = None,
+    state: str | None = None,
+    zip_code: str | None = None,
+    max_price: int | None = None,
+    property_types: list[str] | None = None,
+    limit: int = 200,
+    refresh: bool = False,
+    http: RentCastHttp | None = None,
+    now: float | None = None,
+) -> RentCastResult:
+    """Search RentCast (one API call) and add the results as listings.
+
+    Results are cached for a few hours by search, so repeating a search doesn't spend more of the
+    user's monthly quota. The API key is used only for the request: it is never written to the
+    cache, the database or logs. The hosted site never supplies a key of its own.
+    """
+    src = RentCastSource(
+        api_key,
+        city=city,
+        state=state,
+        zip_code=zip_code,
+        max_price=max_price,
+        property_types=property_types or [],
+        limit=limit,
+        http=http,
+    )
+    params = src.request_params()  # validates the location before anything is spent
+    path = _rentcast_cache_path(settings, params)
+    now = time.time() if now is None else now
+    payload, from_cache, age = None, False, 0
+    if path.exists() and not refresh:
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            if now - cached["fetched_at"] < RENTCAST_CACHE_SECONDS:
+                payload, from_cache = cached["payload"], True
+                age = int((now - cached["fetched_at"]) // 60)
+        except (OSError, ValueError, KeyError):
+            payload = None
+    if payload is None:
+        payload = src.fetch_payload()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"fetched_at": now, "payload": payload}), encoding="utf-8")
+
+    raws = list(src.listings_from_payload(payload))
+    summary = ImportSummary()
+    with session_scope(settings) as s:
+        batch = ImportBatch(source="rentcast", filename=json.dumps(params), rows_total=len(payload))
+        s.add(batch)
+        s.flush()
+        res = upsert_listings(s, raws, batch)
+        batch.rows_skipped = src.skipped
+    summary.new, summary.updated, summary.listing_ids = res.new, res.updated, res.listing_ids
+    return RentCastResult(summary, len(payload), from_cache, age, src.skipped)

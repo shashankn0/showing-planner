@@ -29,8 +29,9 @@ Spaces need a paid plan; only static Spaces are free [V]. GitHub Pages can't run
 4. The password gate (`APP_PASSWORD`) slows guessing (8 tries per page load, a growing delay after
    each wrong guess, and a 15-minute lock after 20 failures). Without `TRUST_PROXY_HEADERS=true`
    all visitors share one counter, so a persistent attacker can lock the gate for everyone; with it
-   (only safe behind a proxy you control, like the Cloudflare tunnel in option B) failures are
-   counted per client address. It is not strong authentication. Use a long passphrase, and use
+   (honored only when the app is started with `--server.address 127.0.0.1`, so a proxy you
+   control, like the Cloudflare tunnel in option B, is the only way in) failures are counted per
+   client address; the sidebar warns if the setting is on but being ignored. It is not strong authentication. Use a long passphrase, and use
    Community Cloud's private app (email sign-in) for anything that matters.
 
 ## Option A: Streamlit Community Cloud, step by step
@@ -79,8 +80,8 @@ winget install --id Cloudflare.cloudflared          # one time
 # window 1: start the app with a password
 cd C:\Users\snell\showing-planner
 $env:APP_PASSWORD = "choose-something-long"
-$env:TRUST_PROXY_HEADERS = "true"     # safe here: only Cloudflare's tunnel can reach the app
-.\.venv\Scripts\streamlit.exe run app/main.py --server.port 8501
+$env:TRUST_PROXY_HEADERS = "true"     # honored only because of --server.address 127.0.0.1 below
+.\.venv\Scripts\streamlit.exe run app/main.py --server.port 8501 --server.address 127.0.0.1
 
 # window 2: open the tunnel
 cloudflared tunnel --url http://localhost:8501
@@ -88,6 +89,16 @@ cloudflared tunnel --url http://localhost:8501
 
 `cloudflared` prints an `https://….trycloudflare.com` address; open it and sign in with the
 password. Press Ctrl+C in each window to stop. The address is new every time.
+
+## What a public-demo visitor sees
+
+1. They open your `*.streamlit.app` link and see Find Homes with a **"Try it with demo listings"**
+   button (36 made-up listings, labeled as demo data), so they can build a tier list in seconds.
+2. They can instead upload their own spreadsheet or paste addresses; it lives only in their private
+   temporary workspace (deleted after about 2 idle hours, or on demand from Settings).
+3. They can search real listings with **their own** RentCast key (Listings > Search). Do **not**
+   add `RENTCAST_API_KEY` to the site's Secrets: the hosted site ignores it by design, because
+   RentCast forbids sharing one key across users and you'd be liable for their overage charges.
 
 ## If something goes wrong
 

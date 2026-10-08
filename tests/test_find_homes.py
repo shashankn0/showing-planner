@@ -310,6 +310,7 @@ def test_forged_proxy_headers_are_ignored_unless_a_proxy_is_trusted(monkeypatch)
         headers = H({"CF-Connecting-IP": "198.51.100.9", "X-Forwarded-For": "1.1.1.1, 2.2.2.2"})
 
     monkeypatch.setattr(ui.st, "context", Ctx())
+    monkeypatch.setattr(ui.st, "get_option", lambda name: "127.0.0.1")
     untrusted = Settings(data_dir=Path("."))
     assert ui._client_key(untrusted) == "direct"  # attacker-controlled headers don't pick the key
     assert ui._client_key(None) == "direct"
@@ -319,6 +320,24 @@ def test_forged_proxy_headers_are_ignored_unless_a_proxy_is_trusted(monkeypatch)
     assert ui._client_key(trusted) == "2.2.2.2"
     Ctx.headers = H({})
     assert ui._client_key(trusted) == "direct"
+
+
+@pytest.mark.parametrize("address", ["", None, "0.0.0.0", "192.168.1.5"])  # noqa: S104
+def test_proxy_headers_are_ignored_when_the_server_is_reachable_directly(monkeypatch, address):
+    class Ctx:
+        headers = {"CF-Connecting-IP": "198.51.100.9"}
+
+    monkeypatch.setattr(ui.st, "context", Ctx())
+    monkeypatch.setattr(ui.st, "get_option", lambda name: address)
+    trusted = Settings(data_dir=Path("."), trust_proxy_headers=True)
+    assert ui._client_key(trusted) == "direct"  # forged headers can't pick the key
+    assert "ignored" in ui.proxy_trust_problem(trusted)
+    assert ui.proxy_trust_problem(Settings(data_dir=Path("."))) is None  # not requested: no noise
+
+
+def test_no_warning_when_proxy_trust_is_safe(monkeypatch):
+    monkeypatch.setattr(ui.st, "get_option", lambda name: "127.0.0.1")
+    assert ui.proxy_trust_problem(Settings(data_dir=Path("."), trust_proxy_headers=True)) is None
 
 
 def test_spraying_addresses_cannot_reset_other_clients_state(monkeypatch):

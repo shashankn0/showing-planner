@@ -14,6 +14,7 @@ from core.models import Listing
 from sources.columns import FIELDS
 from sources.csv_import import ImportAnalysis, analyze_file, analyze_table
 from sources.profiles import load_profiles
+from sources.rentcast import RentCastError
 
 NONE = "(none)"
 FIELD_GROUPS = [
@@ -43,17 +44,101 @@ def render() -> None:
     settings = context()
     st.title("Listings")
     data_note()
-    tab_import, tab_add, tab_photos, tab_all = st.tabs(
-        ["Import a file", "Add by address", "Photos", "All listings"]
+    demo_button(settings, key="demo_listings_page")
+    tab_import, tab_search, tab_add, tab_photos, tab_all = st.tabs(
+        ["Import a file", "Search (RentCast)", "Add by address", "Photos", "All listings"]
     )
     with tab_import:
         _import_tab(settings)
+    with tab_search:
+        _search_tab(settings)
     with tab_add:
         _add_tab(settings)
     with tab_photos:
         _photos_tab(settings)
     with tab_all:
         _all_tab(settings)
+
+
+def demo_button(settings, key: str) -> None:  # noqa: ANN001
+    """One click to try the app with clearly-labeled synthetic listings."""
+    if st.button(
+        "Try it with demo listings", key=key, help="36 made-up listings, labeled as demo data."
+    ):
+        res = services.load_demo_listings(settings)
+        st.success(
+            f"Added {res.new} demo listings (synthetic: made-up addresses and numbers). "
+            "Open Find Homes to build a tier list."
+        )
+
+
+# ------------------------------------------------------------------ search (RentCast)
+
+PROPERTY_TYPES = ["Single Family", "Condo", "Townhouse", "Manufactured", "Multi-Family"]
+
+
+def _search_tab(settings) -> None:  # noqa: ANN001
+    st.write(
+        "Search active for-sale listings by city or ZIP using **RentCast**, a licensed data "
+        "service (no scraping). You use your own RentCast key."
+    )
+    with st.expander("What to know before searching"):
+        st.markdown(
+            "- Get a key at [rentcast.io/api](https://www.rentcast.io/api). Their free plan "
+            "includes 50 calls a month; **each search here uses one call**, and repeating the same "
+            "search within a few hours reuses the saved result instead of spending another.\n"
+            "- **Your key stays in this browser session** and is sent only to RentCast. It is never "
+            "saved, and this site never uses anyone else's key.\n"
+            "- RentCast listings **don't include photos**, so photo-based condition can't be scored "
+            "for them unless you add photos yourself.\n"
+            "- Any charges on your RentCast account are yours."
+        )
+    env_key = None if settings.hosted else settings.rentcast_api_key
+    typed = st.text_input(
+        "RentCast API key",
+        type="password",
+        help="Leave empty to use the key from your .env file." if env_key else None,
+    )
+    c1, c2, c3 = st.columns([3, 1, 2])
+    city = c1.text_input("City", key="rc_city", value=settings.prefs.default_city)
+    state = c2.text_input("State", key="rc_state", value=settings.prefs.default_state, max_chars=2)
+    zip_code = c3.text_input("…or ZIP code", key="rc_zip", max_chars=5)
+    c1, c2, c3 = st.columns(3)
+    max_price = c1.number_input(
+        "Max price ($, optional)", 0, 20_000_000, 0, step=10_000, key="rc_max"
+    )
+    types = c2.multiselect("Property type (optional)", PROPERTY_TYPES, key="rc_types")
+    limit = c3.slider("Most listings to fetch", 25, 500, 100, step=25, key="rc_limit")
+    refresh = st.checkbox("Fetch fresh results even if I searched this recently (uses a call)")
+    key = typed.strip() or env_key or ""
+    if st.button("Search and add to my listings", type="primary"):
+        try:
+            with st.spinner("Searching RentCast…"):
+                res = services.rentcast_search(
+                    settings,
+                    key,
+                    city=city,
+                    state=state,
+                    zip_code=zip_code,
+                    max_price=max_price or None,
+                    property_types=types,
+                    limit=limit,
+                    refresh=refresh,
+                )
+        except RentCastError as exc:
+            st.error(str(exc))
+            return
+        note = (
+            f"reused a saved result from {res.cache_age_minutes} min ago"
+            if res.from_cache
+            else "used 1 API call"
+        )
+        st.success(
+            f"{res.fetched} listings returned ({note}): {res.summary.new} new, "
+            f"{res.summary.updated} updated. Open Find Homes to rank them."
+        )
+        if res.skipped:
+            st.caption(f"{res.skipped} result(s) had no usable address and were skipped.")
 
 
 # ------------------------------------------------------------------ import

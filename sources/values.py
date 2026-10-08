@@ -71,6 +71,14 @@ def parse_date(value: object) -> date | None:
     if is_missing(value):
         return None
     s = str(value).strip()
+    iso = re.match(
+        r"^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$", s
+    )  # 2026-09-12, 2026-09-12T00:00:00.000Z
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        except ValueError:
+            return None
     for fmt in (
         "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d", "%m-%d-%Y", "%b %d, %Y", "%B %d, %Y",
         "%Y-%m-%d %H:%M:%S", "%m/%d/%Y %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ",

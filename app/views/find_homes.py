@@ -6,6 +6,7 @@ import streamlit as st
 
 from app import services
 from app.ui import context, disclaimer, thumbnail
+from app.views.listings import demo_button
 from ranking.engine import Ranked, RankingResult
 from ranking.preferences import (
     CONDITION_MODES,
@@ -39,7 +40,11 @@ def render() -> None:
     )
     pool = services.candidates_from_db(settings)
     if not pool:
-        st.info("No listings to rank yet. Load some on the Listings page first.")
+        st.info(
+            "No listings to rank yet. Load some on the Listings page (upload a file, search, or "
+            "paste addresses), or try the demo first."
+        )
+        demo_button(settings, key="demo_listings_home")
         return
 
     p0, key_prefix = _starting_prefs(settings)

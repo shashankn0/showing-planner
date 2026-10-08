@@ -53,16 +53,38 @@ def reset_auth_throttle() -> None:
     _locked_until.clear()
 
 
+LOOPBACK_ADDRESSES = {"127.0.0.1", "localhost", "::1"}
+
+
+def server_is_loopback_only() -> bool:
+    """True if Streamlit was started with --server.address bound to this machine only."""
+    try:
+        return str(st.get_option("server.address") or "").strip().lower() in LOOPBACK_ADDRESSES
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def proxy_trust_problem(settings: Settings) -> str | None:
+    """Why TRUST_PROXY_HEADERS is switched on but being ignored (None = fine or not requested)."""
+    if settings.trust_proxy_headers and not server_is_loopback_only():
+        return (
+            "TRUST_PROXY_HEADERS is on, but the app is listening on every network interface, so "
+            "anyone who can reach it directly could forge client addresses. The setting is being "
+            "ignored. Start the app with --server.address 127.0.0.1 so only your proxy can reach it."
+        )
+    return None
+
+
 def _client_key(settings: Settings | None = None) -> str:
     """Identity used to throttle sign-in attempts.
 
-    Client-address headers are only believed when the operator has said a trusted proxy sits in
-    front (TRUST_PROXY_HEADERS=true, e.g. a Cloudflare Tunnel). Otherwise anyone reaching the app
-    directly could forge them to dodge the limit, so every visitor shares one key: that still
-    blocks brute force, at the cost that a persistent attacker can lock the gate for everyone
-    (use a private Community Cloud app or Cloudflare Access when that matters).
+    Client-address headers are believed only when the operator has said a trusted proxy sits in
+    front (TRUST_PROXY_HEADERS=true) AND the server is bound to this machine only, so the proxy is
+    the sole way in and nobody can forge the headers. Otherwise every visitor shares one key: that
+    still blocks brute force, at the cost that a persistent attacker can lock the gate for
+    everyone (use a private Community Cloud app or Cloudflare Access when that matters).
     """
-    if not (settings and settings.trust_proxy_headers):
+    if not (settings and settings.trust_proxy_headers and server_is_loopback_only()):
         return "direct"
     try:
         headers = st.context.headers
@@ -195,6 +217,9 @@ def mode_banner(settings: Settings) -> None:
         host = st.context.headers.get("Host")
     except Exception:  # noqa: BLE001
         host = None
+    problem = proxy_trust_problem(settings)
+    if problem:
+        st.sidebar.warning(problem)
     if settings.hosted:
         st.sidebar.caption("Mode: shared website (temporary private workspaces)")
     elif is_exposed_host(host) and not settings.app_password:

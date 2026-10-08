@@ -313,3 +313,23 @@ delivered as a website. Research added for that change:
 | D16 | No scraping. Listing sources: files and paste (built), optional licensed API (RentCast: no documented photos), broker-approved FMLS feed | Site terms and the project's own constraints |
 | D17 | Website = the existing Streamlit app, deployed free on Streamlit Community Cloud (public demo / bring-your-own-data) or via a Cloudflare tunnel (your own data, with a password) | Free, no domain, smallest change; a rewrite to a separate frontend adds cost without adding capability yet |
 | D18 | Hosted mode: isolated temp workspace per visitor, stale cleanup, optional password gate, loud warning if exposed without either | A shared database on a public site would leak one visitor's uploads to the next; the host's secrets-to-env behavior is unverified, so the failure mode must be visible |
+
+### Addendum 2: decisions and findings after the product review
+
+- **RentCast API terms** [S: summarized from [terms-api](https://www.rentcast.io/terms-api); read
+  the original before relying on it]: an API key may not be shared with others for their own
+  independent use; the key holder is liable for overage charges, authorized or not; storing the data
+  internally and displaying/distributing it to end users is permitted; attribution not required.
+  Response field names and the `X-Api-Key` header verified on the
+  [sale listings reference](https://developers.rentcast.io/reference/sale-listings). The
+  free-vs-paid multi-user line matters most: a public site must use each visitor's own key.
+- **School zoning and rating data:** see [PRODUCT.md](PRODUCT.md) for sources. Net: no verified
+  current free source for "zoned school + official rating", and GreatSchools-style ratings track
+  demographics.
+
+| # | Decision | Why |
+|---|---|---|
+| D19 | Audience = public demo; hosted mode + built-in synthetic demo listings so first-time visitors can try it with no data | The user chose a public demo; synthetic data avoids any MLS-licensing question |
+| D20 | RentCast search is bring-your-own-key: held per session, never persisted, never falls back to the owner's key in hosted mode; results cached 6 hours per search to protect the user's quota | RentCast forbids sharing a key and charges the key holder for overage |
+| D21 | School filter deferred until districts are chosen and an official, current data source is confirmed; ratings from commercial aggregators are excluded | No verified source found; documented demographic correlation makes aggregator ratings a steering risk |
+| D22 | Sign-in throttle trusts proxy headers only when `TRUST_PROXY_HEADERS` is set **and** the server is bound to loopback; throttle tables are bounded and expire | Forged headers or direct network access could otherwise bypass the per-client limit |
