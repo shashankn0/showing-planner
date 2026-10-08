@@ -91,3 +91,44 @@ threshold is a rule of thumb, not a result from the literature.
   `config/vision.yaml`) were set by judgment, not tuned on a large real set.
 - **Not an appraisal or inspection.** Use it to decide which homes to look at, not to value or
   describe a home to clients.
+
+## Measured so far (read before trusting any number)
+
+A smoke test of the **real** model (OpenCLIP ViT-B/32 `laion2b_s34b_b79k`, CPU only, no GPU) on 43
+freely licensed Wikimedia Commons images that I picked by eye: 28 photos of rooms and house
+exteriors (8 kitchens, 6 bedrooms, 6 living rooms including 3 scans of one photo, 8 exteriors)
+and 15 non-property images (5 floor plans, 5 maps, 5 logos). Many room photos are **historical or
+museum interiors**, not modern listing photos, and I had **no bathroom photos** (the download was
+rate-limited), so this says little about real listings.
+
+| What | Result |
+|---|---|
+| Speed | 6.4 photos per second; 63 s first load (includes the model download), 5 s afterwards |
+| Room type (zero-shot) | 26 of 28 correct (kitchen 7/8, bedroom 5/6, living 6/6, exterior 8/8) |
+| Floor plans, maps, logos auto-excluded | 15 of 15 |
+| Real room photos wrongly excluded as non-property | 0 of 28 |
+| Duplicates | the 3 scans of one photo collapse to 1, nothing else flagged (see the fix below) |
+| Condition (zero-shot) | spread 1.3 to 4.0, mostly low confidence. A modern white kitchen scored highest of the kitchens (3.9) and two old narrow kitchens lowest (1.3). **There are no ground-truth ratings, so accuracy is unknown.** |
+
+What this does **not** show: how well condition scores match your judgment, how well flags work on
+modern listing photos, or how bathrooms behave. The **training loop** (label, train, evaluate,
+activate, re-score) is tested on synthetic photos only; it has not been run on a real set of your
+labels. Those numbers will appear in the model card the first time you train.
+
+Real-data findings that changed the code:
+
+- **Duplicates.** Re-scans of one photo differed by 5 to 9 bits of the image hash (the limit was 4)
+  yet had embeddings 0.97 to 0.98 similar, versus 0.61 to 0.70 for different living-room photos.
+  Duplicates are now "hash very close" or "hash fairly close AND embeddings nearly identical".
+- **Flat images.** Plain-colored images all hash to the same value and would be called duplicates of
+  each other, so near-flat images are skipped in duplicate checks.
+
+Real-browser findings (Playwright + headless Chromium) that changed the code:
+
+- After a shortcut clicked a radio button or checkbox, the browser kept focus on it and the key
+  handler then ignored all further keys. Only text boxes should be ignored.
+- Streamlit ignores a scripted click on a checkbox or radio label; the underlying input must be
+  clicked.
+- Text that looks like HTML tags inside the keyboard script made Streamlit skip the whole script.
+- Giving the default page its own URL path produced a "Page not found" dialog.
+- Two dollar signs in one line were rendered as a math formula in the tier-list cards.

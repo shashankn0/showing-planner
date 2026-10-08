@@ -5,16 +5,19 @@ A web app for real estate agents. Tell it what a client wants and it ranks your 
 
 1. **Find Homes**: enter budget, beds/baths, size, places the client drives to, and how they feel
    about condition; get a tier list with strengths, watch-outs and a score breakdown.
-2. **Photo condition scoring** *(next phase)*: scores listing photos for physical condition and
-   feeds the tiers.
+2. **Photo condition scoring**: scores listing photos for physical condition (room type,
+   1-5 condition, flags), sets aside floor plans/maps/logos/duplicates, and feeds the tiers.
+   Optional install; train it on your own ratings. See [docs/VISION.md](docs/VISION.md).
 3. **Showing route planning** *(later phase)*: sequence a day of showings with time windows.
 
 It is **not tied to any MLS**: import any spreadsheet or export that has addresses, and photos
 from any folder or zip. It never scrapes listing sites, and tiers never use neighborhood
 demographics. See [docs/PRODUCT.md](docs/PRODUCT.md) for exactly what goes into a tier and why.
 
-> **Status:** listings, photos, geocoding, the tier-list engine, client profiles and hosting
-> protections are built and tested. Photo scoring and routing are not built yet.
+> **Status:** listings, photos, geocoding, the tier-list engine, client profiles, hosting
+> protections and photo condition scoring are built and tested (unit tests, plus an opt-in
+> real-browser suite). Route planning is not built yet. Photo scoring has been run on real
+> photos only as a small smoke test; its accuracy on *your* photos is unknown until you label some.
 >
 > **Put it online free** (no domain purchase): [docs/DEPLOY.md](docs/DEPLOY.md).
 >
@@ -31,7 +34,15 @@ copy .env.example .env        # optional: add keys later
 streamlit run app/main.py
 ```
 
+Photo scoring is optional (about 1 GB, plus a ~600 MB model download on first use):
+
+```powershell
+pip install -r requirements-vision.txt
+```
+
 Developers: `pip install -r requirements-dev.txt`, then `pytest` and `ruff check .`.
+Real-browser tests: `pip install playwright`, `python -m playwright install chromium`, then
+`$env:E2E="1"; pytest tests/e2e`.
 
 ## Using it
 
@@ -47,7 +58,12 @@ Developers: `pip install -r requirements-dev.txt`, then `pytest` and `ruff check
 3. **Listings -> Photos.** Point to a folder or zip. Photos are matched to listings by MLS number
    or address in the folder/file names; anything unmatched you assign by hand. Folders named like
    addresses can create listings (photos-only mode).
-4. **Photo Review** lets you look through a listing's photos and exclude floor plans, maps, logos.
+4. **Photo Review**: *Score this listing*, then see each photo's room, condition, flags and what
+   was set aside, plus the listing's overall score, weakest room and any missing coverage.
+   Override any exclusion with a checkbox.
+4b. **Labeling**: rate photos 1-5 with one keypress (`1`-`5`; `K B L R E O` room; `W F T C P`
+   flags; `N` unsure, `S` skip, `U` undo, `X` exclude). After ~50 labels, *Train from my labels*
+   compares models on a holdout you never trained on and tells you if it beats the baseline.
 5. **Settings** holds defaults, key status and saved layouts.
 
 Old Excel `.xls` files aren't supported: in Excel, use *Save As -> CSV* or *.xlsx*.

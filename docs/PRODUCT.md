@@ -23,7 +23,7 @@ list is enforced in code (`ranking/preferences.py`); anything else is rejected.
 | Living space | Sq ft vs. client minimum and ideal | Built |
 | Value | $/sq ft vs. the other homes being compared (needs 5+ similar homes) | Built |
 | Commute | Distance to places the **client names**, as a straight-line estimate | Built (real drive times in the routing phase) |
-| Condition from photos | Photo scoring, with the client's attitude (move-in ready / project OK / don't care) | **Next phase.** Not scored yet, so it's skipped, not guessed |
+| Condition from photos | Photo scoring ([VISION.md](VISION.md)), with the client's attitude (move-in ready / project OK / don't care). Shows the weakest room and flags limited photo coverage | **Built** (optional install). A listing with no scored photos is skipped for this factor, not guessed |
 | Year built, lot size, time on market | Listing facts | Built (time on market is opt-in) |
 | Flood zone | FEMA flood map lookup (free, keyless) | Planned |
 
@@ -99,7 +99,8 @@ cover and I can scope it. Until then no school data enters any score.
 
 1. **Done:** import any listing file, photos, geocoding, preference-driven tier list, client
    profiles, hosting protections, demo listings, RentCast search (bring your own key).
-2. **Next:** photo condition scoring (zero-shot baseline, then your labels train a small ordinal
-   model) feeding the "condition" criterion.
+2. **Done:** photo condition scoring (zero-shot baseline, then your labels train a small ordinal
+   model) feeding the "condition" criterion. Next: label 300 to 500 photos and check the model
+   card against the baseline.
 3. Then: real drive times (OpenRouteService) and flood zones; optional listing API; route planner
    for a day of showings.

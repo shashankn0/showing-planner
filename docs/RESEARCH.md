@@ -333,3 +333,14 @@ delivered as a website. Research added for that change:
 | D20 | RentCast search is bring-your-own-key: held per session, never persisted, never falls back to the owner's key in hosted mode; results cached 6 hours per search to protect the user's quota | RentCast forbids sharing a key and charges the key holder for overage |
 | D21 | School filter deferred until districts are chosen and an official, current data source is confirmed; ratings from commercial aggregators are excluded | No verified source found; documented demographic correlation makes aggregator ratings a steering risk |
 | D22 | Sign-in throttle trusts proxy headers only when `TRUST_PROXY_HEADERS` is set **and** the server is bound to loopback; throttle tables are bounded and expire | Forged headers or direct network access could otherwise bypass the per-client limit |
+
+### Addendum 3: photo scoring decisions and what real data taught us
+
+| # | Decision | Why |
+|---|---|---|
+| D23 | Frozen OpenCLIP ViT-B/32 embeddings + zero-shot baseline + small ordinal heads (ridge+thresholds vs CORN-linear), chosen by cross-validation; no fine-tuning | No labels yet; CPU is enough (6.4 photos/s measured); cheap to retrain |
+| D24 | Models saved as plain arrays (`.npz` + JSON), never pickle | A pickle can run code when loaded, and the app can run hosted |
+| D25 | 1 photo in 5 (by file hash) is a permanent holdout; baseline scored on the same rows; own re-label agreement reported | Honest evaluation; the label count is small so leakage would be easy |
+| D26 | Duplicates = very close hash, or fairly close hash AND near-identical embedding; flat images skipped | Measured on real re-scans: hash alone missed them (5-9 bits), embedding separated them cleanly (0.97 vs 0.61-0.70) |
+| D27 | Optional install (`requirements-vision.txt`); never in the public demo | ~1 GB of packages plus a 600 MB model |
+| D28 | Browser-level tests (opt-in) are part of the suite | They caught five real bugs (focus handling, label clicks, script parsing, default-page URL, dollar signs) that in-process tests could not |

@@ -90,6 +90,14 @@ cloudflared tunnel --url http://localhost:8501
 `cloudflared` prints an `https://….trycloudflare.com` address; open it and sign in with the
 password. Press Ctrl+C in each window to stop. The address is new every time.
 
+## Photo scoring on a public site
+
+Leave it off. It needs about 1 GB of extra packages and a ~600 MB model, which doesn't fit
+Community Cloud's free memory comfortably (2.7 GB at most [V]) and would make every build slow.
+`requirements.txt` deliberately excludes it, so the hosted app shows Photo Review and Labeling with
+a note that scoring isn't enabled, and the tier list simply omits the photo-condition factor.
+Run photo scoring on your own computer (private mode) where your photos and labels stay local.
+
 ## What a public-demo visitor sees
 
 1. They open your `*.streamlit.app` link and see Find Homes with a **"Try it with demo listings"**
