@@ -98,7 +98,7 @@ def test_listings_failing_requirements_are_excluded_with_reasons():
     res = run(cands, prefs(property_types=["Single Family"], min_year_built=1980))
     assert [r.candidate.id for r in res.ranked] == [1]
     why = {r.candidate.id: " ".join(r.excluded_reasons) for r in res.excluded}
-    assert "over the $450,000" in why[2] and "needs 3+" in why[3] and "bathrooms" in why[4]
+    assert "over the $450,000" in why[2] and "needs 3+" in why[3] and "1 bathroom;" in why[4]
     assert "sq ft" in why[5] and "Condo" in why[6] and "pending" in why[7] and "1950" in why[8]
     assert all(r.tier == "X" for r in res.excluded)
 
@@ -249,3 +249,10 @@ def test_negotiation_signal_is_opt_in():
     opted = run([old], prefs(weights={"negotiation": 5})).ranked[0]
     f = next(f for f in opted.factors if f.key == "negotiation")
     assert f.score == 1.0 and "120 days on market" in f.detail
+
+
+def test_exclusion_text_uses_correct_plurals():
+    res = run([cand(1, beds=1, baths=1.0), cand(2, beds=2, baths=1.5)], prefs())
+    why = {r.candidate.id: " ".join(r.excluded_reasons) for r in res.excluded}
+    assert "1 bedroom;" in why[1] and "1 bathroom;" in why[1]
+    assert "2 bedrooms;" in why[2] and "1.5 bathrooms;" in why[2]

@@ -22,13 +22,15 @@ Spaces need a paid plan; only static Spaces are free [V]. GitHub Pages can't run
    uploads into their *own* temporary workspace.
 2. **Turn on hosted mode for any public site.** Without it, every visitor would share one
    database and see each other's uploads. Hosted mode gives each browser session an isolated
-   temporary workspace, deleted after about 6 idle hours or on server restart. The app warns in
+   temporary workspace, deleted after about 2 idle hours or on server restart, and the visitor can delete it any time from Settings. The app warns in
    the sidebar if it's reachable from the internet without a password or hosted mode.
 3. **Keys go in the host's Secrets**, never in the repo. `.gitignore` already excludes `data/`,
    `.env` and databases.
-4. The password gate (`APP_PASSWORD`) is a speed bump (8 tries per page load), not strong
-   authentication. For real confidentiality use Community Cloud's private app with an email
-   viewer list.
+4. The password gate (`APP_PASSWORD`) slows guessing (8 tries per page load, a growing delay after
+   each wrong guess, and a server-wide lock of 15 minutes after 20 failures from anyone) but it is
+   not strong authentication, and a determined attacker could lock everyone out for a while.
+   Use a long passphrase. For real confidentiality use Community Cloud's private app with an
+   email viewer list.
 
 ## Option A: Streamlit Community Cloud, step by step
 

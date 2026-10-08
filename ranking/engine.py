@@ -85,6 +85,11 @@ class RankingResult:
         return out
 
 
+def _n(n: float, word: str) -> str:
+    """'1 bedroom', '2 bedrooms', '2.5 bathrooms'."""
+    return f"{n:g} {word}" if n == 1 else f"{n:g} {word}s"
+
+
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
@@ -109,9 +114,9 @@ def _exclusions(
     if p.min_price is not None and need(c.price, "Price") and c.price < p.min_price:
         reasons.append(f"Price ${c.price:,} is under the ${p.min_price:,} minimum")
     if p.min_beds is not None and need(c.beds, "Bedrooms") and c.beds < p.min_beds:
-        reasons.append(f"{c.beds} bedrooms; needs {p.min_beds}+")
+        reasons.append(f"{_n(c.beds, 'bedroom')}; needs {p.min_beds}+")
     if p.min_baths is not None and need(c.baths, "Bathrooms") and c.baths < p.min_baths:
-        reasons.append(f"{c.baths:g} bathrooms; needs {p.min_baths:g}+")
+        reasons.append(f"{_n(c.baths, 'bathroom')}; needs {p.min_baths:g}+")
     if p.min_sqft is not None and need(c.sqft, "Square footage") and c.sqft < p.min_sqft:
         reasons.append(f"{c.sqft:,} sq ft; needs {p.min_sqft:,}+")
     if (

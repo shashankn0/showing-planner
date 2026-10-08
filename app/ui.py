@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import shutil
 import tempfile
@@ -14,7 +15,7 @@ import streamlit as st
 from PIL import Image, ImageOps
 
 from core.config import DISCLAIMER, Settings, UserPrefs, get_settings
-from core.db import dispose_engines, init_db
+from core.db import dispose_engine, init_db
 from core.models import Photo
 from sources.photos import resolve_photo_path
 
@@ -24,32 +25,74 @@ DATA_NOTE = (
 )
 HOSTED_NOTE = (
     "Shared website mode: your uploads live in a private, temporary workspace for this browser "
-    "session only and are deleted afterwards. Don't upload MLS-licensed data or photos here "
-    "unless your broker has approved using a hosted tool."
+    "session, are deleted after about 2 idle hours, and you can delete them any time on the "
+    "Settings page. Don't upload MLS-licensed data or photos here unless your broker has "
+    "approved using a hosted tool."
 )
 THUMB_PX = 420
 SESSION_ROOT = Path(tempfile.gettempdir()) / "showing_planner_sessions"
-STALE_AFTER_SECONDS = 6 * 3600
-MAX_PASSWORD_ATTEMPTS = 8
+STALE_AFTER_SECONDS = 2 * 3600
+SWEEP_EVERY_SECONDS = 600
+MAX_PASSWORD_ATTEMPTS = 8  # per browser session
+# Server-wide throttle: a reload gives a fresh session, so per-session limits alone don't stop
+# brute force. Too many failures from anyone locks sign-in for everyone for a while.
+GLOBAL_MAX_FAILURES = 20
+GLOBAL_WINDOW_SECONDS = 900
+GLOBAL_LOCK_SECONDS = 900
 
-_swept = False
+_last_sweep = 0.0
+_failures: list[float] = []
+_locked_until = 0.0
+_pause = time.sleep  # replaced in tests
 
 
-def _sweep_stale_workspaces() -> None:
-    """Delete visitor workspaces nobody has touched for a while (once per server process)."""
-    global _swept  # noqa: PLW0603
-    if _swept or not SESSION_ROOT.exists():
-        _swept = True
+def reset_auth_throttle() -> None:
+    global _locked_until  # noqa: PLW0603
+    _failures.clear()
+    _locked_until = 0.0
+
+
+def _lock_remaining(now: float) -> float:
+    return max(_locked_until - now, 0.0)
+
+
+def _note_failure(now: float) -> None:
+    global _locked_until  # noqa: PLW0603
+    _failures[:] = [t for t in _failures if now - t < GLOBAL_WINDOW_SECONDS]
+    _failures.append(now)
+    if len(_failures) >= GLOBAL_MAX_FAILURES:
+        _locked_until = now + GLOBAL_LOCK_SECONDS
+        _failures.clear()
+
+
+def _sweep_stale_workspaces(now: float | None = None) -> None:
+    """Delete visitor workspaces nobody has touched for a while (at most every 10 minutes)."""
+    global _last_sweep  # noqa: PLW0603
+    now = time.time() if now is None else now
+    if now - _last_sweep < SWEEP_EVERY_SECONDS:
         return
-    _swept = True
-    cutoff = time.time() - STALE_AFTER_SECONDS
+    _last_sweep = now
+    if not SESSION_ROOT.exists():
+        return
+    cutoff = now - STALE_AFTER_SECONDS
     for d in SESSION_ROOT.iterdir():
         try:
             if d.is_dir() and d.stat().st_mtime < cutoff:
                 shutil.rmtree(d, ignore_errors=True)
+                dispose_engine(f"sqlite:///{(d / 'app.db').as_posix()}")
         except OSError:
             continue
-    dispose_engines()
+
+
+def wipe_workspace() -> None:
+    """Delete this visitor's uploads and saved data right now (hosted mode)."""
+    ws = st.session_state.pop("_workspace", None)
+    st.session_state.pop("_db_ready", None)
+    for key in ("ranking", "photo_scan"):
+        st.session_state.pop(key, None)
+    if ws:
+        dispose_engine(f"sqlite:///{(Path(ws) / 'app.db').as_posix()}")
+        shutil.rmtree(ws, ignore_errors=True)
 
 
 def _session_workspace() -> Path:
@@ -156,8 +199,14 @@ def password_ok(settings: Settings) -> bool:
         return True
     if st.session_state.get("_authed"):
         return True
-    attempts = st.session_state.get("_attempts", 0)
     st.title("Showing Planner")
+    remaining = _lock_remaining(time.monotonic())
+    if remaining > 0:
+        st.error(
+            f"Too many failed sign-ins. Try again in about {math.ceil(remaining / 60)} minute(s)."
+        )
+        return False
+    attempts = st.session_state.get("_attempts", 0)
     if attempts >= MAX_PASSWORD_ATTEMPTS:
         st.error("Too many attempts. Reload the page to try again.")
         return False
@@ -167,8 +216,10 @@ def password_ok(settings: Settings) -> bool:
             if hmac.compare_digest(pw.encode(), settings.app_password.encode()):
                 st.session_state["_authed"] = True
                 st.rerun()
+            _note_failure(time.monotonic())
+            _pause(min(0.25 * 2**attempts, 4.0))  # each wrong guess costs more time
             st.session_state["_attempts"] = attempts + 1
-            if attempts + 1 >= MAX_PASSWORD_ATTEMPTS:
+            if attempts + 1 >= MAX_PASSWORD_ATTEMPTS or _lock_remaining(time.monotonic()) > 0:
                 st.rerun()  # show the lockout message right away
             st.error("That password isn't right.")
     return False

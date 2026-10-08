@@ -64,3 +64,10 @@ def dispose_engines() -> None:
     for engine in _engines.values():
         engine.dispose()
     _engines.clear()
+
+
+def dispose_engine(url: str) -> None:
+    """Close and forget the engine for one database (e.g. a deleted visitor workspace)."""
+    engine = _engines.pop(url, None)
+    if engine is not None:
+        engine.dispose()

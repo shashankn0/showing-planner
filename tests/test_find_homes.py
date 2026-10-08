@@ -45,6 +45,14 @@ class FakeCensus:
         return R()
 
 
+@pytest.fixture(autouse=True)
+def _auth_state(monkeypatch):
+    ui.reset_auth_throttle()
+    monkeypatch.setattr(ui, "_pause", lambda _s: None)  # don't really wait in tests
+    yield
+    ui.reset_auth_throttle()
+
+
 @pytest.fixture
 def settings(tmp_path, monkeypatch):
     monkeypatch.setenv("SHOWING_DATA_DIR", str(tmp_path / "data"))
@@ -162,7 +170,7 @@ def test_main_app_lists_find_homes_first(settings):
 def hosted(tmp_path, monkeypatch):
     monkeypatch.setenv("SHOWING_HOSTED", "1")
     monkeypatch.setattr(ui, "SESSION_ROOT", tmp_path / "sessions")
-    monkeypatch.setattr(ui, "_swept", False)
+    monkeypatch.setattr(ui, "_last_sweep", 0.0)
     return tmp_path / "sessions"
 
 
@@ -188,7 +196,7 @@ def test_hosted_visitors_cannot_see_each_others_data(hosted):
 def test_stale_workspaces_are_swept(hosted):
     old = hosted / "s_old"
     old.mkdir(parents=True)
-    ancient = time.time() - 7 * 3600
+    ancient = time.time() - 3 * 3600
     os.utime(old, (ancient, ancient))
     fresh = hosted / "s_fresh"
     fresh.mkdir()
@@ -261,3 +269,66 @@ def test_secrets_can_turn_on_hosted_mode(settings, monkeypatch):
     monkeypatch.setattr(ui.st, "secrets", {"SHOWING_HOSTED": "true", "APP_PASSWORD": "pw"})
     s = ui.load_settings()
     assert s.hosted and s.app_password == "pw"
+
+
+# ------------------------------------------------------------------ review follow-ups
+
+
+def test_failures_across_sessions_lock_sign_in_server_wide(settings, monkeypatch):
+    monkeypatch.setenv("APP_PASSWORD", "open-sesame")
+    # many different visitors (fresh sessions) each guess wrong a few times
+    for _ in range(ui.GLOBAL_MAX_FAILURES // 4):
+        at = AppTest.from_file(MAIN, default_timeout=30).run()
+        for _ in range(4):
+            at.text_input[0].set_value("guess")
+            at.button[0].click().run()
+    # a brand-new session is now locked out, even with the right password
+    fresh = AppTest.from_file(MAIN, default_timeout=30).run()
+    assert any("Too many failed sign-ins" in e.value for e in fresh.error)
+    assert not fresh.text_input  # no form to type into
+    # after the lock expires, sign-in works again
+    monkeypatch.setattr(ui, "_locked_until", 0.0)
+    again = AppTest.from_file(MAIN, default_timeout=30).run()
+    again.text_input[0].set_value("open-sesame")
+    again.button[0].click().run()
+    assert any("Find Homes" in t.value for t in again.title)
+
+
+def test_each_wrong_guess_adds_a_delay(settings, monkeypatch):
+    waits = []
+    monkeypatch.setattr(ui, "_pause", waits.append)
+    monkeypatch.setenv("APP_PASSWORD", "open-sesame")
+    at = AppTest.from_file(MAIN, default_timeout=30).run()
+    for _ in range(3):
+        at.text_input[0].set_value("nope")
+        at.button[0].click().run()
+    assert waits == sorted(waits) and waits[-1] > waits[0] > 0
+
+
+def test_visitor_can_delete_their_own_data(hosted):
+    at = AppTest.from_string(
+        "from app.views.settings import render\nrender()", default_timeout=30
+    ).run()
+    ws = Path(at.session_state["_workspace"])
+    services.add_addresses(
+        Settings(data_dir=ws), "12 Sample Rd, Testville, GA 30301", geocode=False
+    )
+    assert ws.exists()
+    delete = next(b for b in at.button if "Delete everything" in b.label)
+    delete.click().run()
+    assert not at.exception, at.exception
+    assert not ws.exists()
+    assert at.session_state["_workspace"] != str(ws)  # a fresh empty workspace was created
+
+
+def test_workspace_sweep_runs_at_most_every_ten_minutes(hosted):
+    old = hosted / "s_old"
+    old.mkdir(parents=True)
+    ancient = time.time() - 3 * 3600
+    os.utime(old, (ancient, ancient))
+    ui._last_sweep = time.time() - 60  # swept a minute ago
+    ui._sweep_stale_workspaces()
+    assert old.exists()  # too soon; left alone
+    ui._last_sweep = time.time() - 3600
+    ui._sweep_stale_workspaces()
+    assert not old.exists()

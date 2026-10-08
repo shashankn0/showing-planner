@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.ui import DATA_NOTE, context, disclaimer
+from app.ui import DATA_NOTE, HOSTED_NOTE, context, disclaimer, wipe_workspace
 from core.config import DEFAULT_NOMINATIM_UA
 from sources.profiles import delete_profile, load_profiles
 
@@ -85,12 +85,19 @@ def render() -> None:
             st.rerun()
 
     st.subheader("Your data")
-    st.write(f"Location: `{settings.data_dir}`")
     photos_mb = _size_mb(settings.photos_dir)
+    if settings.hosted:
+        st.write("Your uploads are in a private temporary workspace on the server.")
+        st.info(HOSTED_NOTE)
+        if st.button("Delete everything I uploaded now"):
+            wipe_workspace()
+            st.rerun()
+    else:
+        st.write(f"Location: `{settings.data_dir}`")
+        st.info(DATA_NOTE)
     st.write(
         f"Photos: {photos_mb:.1f} MB · Everything else: {_size_mb(settings.data_dir) - photos_mb:.1f} MB"
     )
-    st.info(DATA_NOTE)
     st.markdown(
         "- This tool never scrapes MLS or listing sites.\n"
         "- Don't import alarm or lockbox codes. The importer masks digits after words like "
