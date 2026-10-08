@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from core.config import DEFAULT_NOMINATIM_UA, Settings
 from core.models import GeocodeCache, Listing
-from sources.addresses import clean, normalize_street
+from sources.addresses import clean, is_plausible_street, normalize_street, parse_full_address
 
 CENSUS_BATCH_URL = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch"
 CENSUS_BENCHMARK = "Public_AR_Current"
@@ -106,6 +106,26 @@ class Geocoder:
         if misses:
             self._nominatim_fallback(session, misses, report)
         return report
+
+    def geocode_text(self, session: Session, text: str) -> tuple[float, float] | None:
+        """Look up one free-text address (e.g. a client's workplace). Cached like any other."""
+        parsed = parse_full_address(
+            text, self.settings.prefs.default_city, self.settings.prefs.default_state
+        )
+        if not is_plausible_street(parsed.street, parsed.city, parsed.state, parsed.postal_code):
+            return None
+        tmp = Listing(
+            street=parsed.street,
+            city=parsed.city,
+            state=parsed.state,
+            postal_code=parsed.postal_code,
+            address_full=clean(text),
+            geocode_status="none",
+        )  # transient: never added to the session
+        self.geocode_listings(session, [tmp], force=True)
+        if tmp.latitude is None or tmp.longitude is None:
+            return None
+        return tmp.latitude, tmp.longitude
 
     @staticmethod
     def set_manual_pin(listing: Listing, lat: float, lon: float) -> None:

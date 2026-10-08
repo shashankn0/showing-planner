@@ -13,8 +13,10 @@ from sqlalchemy import func, select
 from core.config import Settings
 from core.db import session_scope
 from core.geocoding import Geocoder, GeocodeReport, Http
-from core.models import ImportBatch, Listing, Photo
+from core.models import Client, ImportBatch, Listing, ListingScore, Photo
 from core.store import upsert_listings
+from ranking.engine import Candidate, RankingResult, rank
+from ranking.preferences import Destination, Preferences
 from sources.base import RawListing
 from sources.csv_import import CsvImportSource, ImportAnalysis
 from sources.manual import ManualEntrySource
@@ -233,4 +235,138 @@ def listings_table(settings: Settings) -> pd.DataFrame:
             }
             for lst in s.scalars(select(Listing).order_by(Listing.id.desc()))
         ]
+    return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------------------ ranking ("Find Homes")
+
+
+def candidates_from_db(settings: Settings) -> list[Candidate]:
+    """Listings reduced to the facts the ranking may use, plus photo condition when scored."""
+    with session_scope(settings) as s:
+        latest: dict[int, ListingScore] = {}
+        for sc in s.scalars(select(ListingScore).order_by(ListingScore.created_at)):
+            latest[sc.listing_id] = sc
+        out = []
+        for lst in s.scalars(select(Listing).order_by(Listing.id)):
+            sc = latest.get(lst.id)
+            out.append(
+                Candidate(
+                    id=lst.id,
+                    address=lst.address_full,
+                    price=lst.list_price,
+                    beds=lst.beds,
+                    baths=lst.baths_total,
+                    sqft=lst.sqft,
+                    lot_sqft=lst.lot_sqft,
+                    year_built=lst.year_built,
+                    property_type=lst.property_type,
+                    status=lst.status,
+                    lat=lst.latitude,
+                    lon=lst.longitude,
+                    list_date=lst.list_date,
+                    condition=sc.overall if sc else None,
+                    condition_photos=sc.n_photos_used if sc else 0,
+                    mls=lst.source_listing_id,
+                    is_synthetic=lst.is_synthetic,
+                )
+            )
+    return out
+
+
+def run_ranking(settings: Settings, prefs: Preferences) -> RankingResult:
+    return rank(candidates_from_db(settings), prefs)
+
+
+def resolve_destination(
+    settings: Settings,
+    name: str,
+    address: str,
+    *,
+    weight: float = 1.0,
+    max_minutes: float | None = None,
+    http: Http | None = None,
+) -> tuple[Destination | None, str]:
+    """Geocode a place the client named. Returns (destination, message-if-failed)."""
+    with session_scope(settings) as s:
+        found = Geocoder(settings, http).geocode_text(s, address)
+    if found is None:
+        return None, (f"Couldn't find “{address}”. Add the city and ZIP, or leave this place out.")
+    return (
+        Destination(
+            name=name.strip() or "Place",
+            lat=found[0],
+            lon=found[1],
+            weight=weight,
+            max_minutes=max_minutes,
+            address=address.strip(),
+        ),
+        "",
+    )
+
+
+def save_client(settings: Settings, label: str, prefs: Preferences) -> int:
+    """Save a client's search criteria under a nickname (create or update)."""
+    label = label.strip()
+    if not label:
+        raise ValueError("Give the client a nickname first.")
+    with session_scope(settings) as s:
+        client = s.scalar(select(Client).where(Client.label == label))
+        if client is None:
+            client = Client(label=label)
+            s.add(client)
+        client.preferences = prefs.to_dict()
+        client.condition_mode = prefs.condition_mode
+        s.flush()
+        return client.id
+
+
+def list_clients(settings: Settings) -> list[tuple[int, str]]:
+    with session_scope(settings) as s:
+        return [(c.id, c.label) for c in s.scalars(select(Client).order_by(Client.label))]
+
+
+def load_client_prefs(settings: Settings, client_id: int) -> Preferences | None:
+    with session_scope(settings) as s:
+        client = s.get(Client, client_id)
+        if client is None or not client.preferences:
+            return None
+        return Preferences.from_dict(client.preferences)
+
+
+def first_photos(settings: Settings, listing_ids: list[int]) -> dict[int, Photo]:
+    """First usable photo per listing, for thumbnails in result cards."""
+    out: dict[int, Photo] = {}
+    with session_scope(settings) as s:
+        q = (
+            select(Photo)
+            .where(Photo.listing_id.in_(listing_ids), Photo.excluded.is_(False))
+            .order_by(Photo.listing_id, Photo.order_idx)
+        )
+        for p in s.scalars(q):
+            out.setdefault(p.listing_id, p)
+    return out
+
+
+def ranking_table(result: RankingResult) -> pd.DataFrame:
+    """Flat table of the tier list (for display and CSV export)."""
+    rows = []
+    for r in result.ranked:
+        c = r.candidate
+        rows.append(
+            {
+                "Tier": r.tier,
+                "Score": r.score,
+                "Data coverage": f"{r.coverage:.0%}",
+                "MLS #": c.mls or "",
+                "Address": c.address,
+                "Price": c.price,
+                "Beds": c.beds,
+                "Baths": c.baths,
+                "Sq ft": c.sqft,
+                "Strengths": " | ".join(r.strengths),
+                "Watch-outs": " | ".join(r.watchouts),
+                "Missing": " | ".join(r.unknowns),
+            }
+        )
     return pd.DataFrame(rows)

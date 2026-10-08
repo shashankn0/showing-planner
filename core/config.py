@@ -52,6 +52,9 @@ class Settings:
     google_maps_api_key: str | None = None
     nominatim_user_agent: str = DEFAULT_NOMINATIM_UA
     prefs: UserPrefs = field(default_factory=UserPrefs)
+    # Hosted (shared website) mode: every visitor gets an isolated, temporary workspace.
+    hosted: bool = False
+    app_password: str | None = None
 
     @property
     def db_path(self) -> Path:
@@ -92,9 +95,15 @@ class Settings:
             ors_api_key=os.environ.get("ORS_API_KEY") or None,
             google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY") or None,
             nominatim_user_agent=os.environ.get("NOMINATIM_USER_AGENT") or DEFAULT_NOMINATIM_UA,
+            hosted=_truthy(os.environ.get("SHOWING_HOSTED")) or Path("/mount/src").is_dir(),
+            app_password=os.environ.get("APP_PASSWORD") or None,
         )
         s.prefs = UserPrefs.load(s.prefs_path)
         return s
+
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_settings() -> Settings:

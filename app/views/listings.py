@@ -215,20 +215,28 @@ def _photos_tab(settings) -> None:  # noqa: ANN001
             "- Folder names can have extra words: `7000101 - Sample Way`\n"
             "- Anything that can't be matched, you assign by hand below."
         )
-    where = st.radio(
-        "Where are the photos?", ["A folder on this computer", "A zip file"], horizontal=True
+    # A hosted server can't see the visitor's folders, so only zip upload makes sense there.
+    where = (
+        "A zip file"
+        if settings.hosted
+        else st.radio(
+            "Where are the photos?", ["A folder on this computer", "A zip file"], horizontal=True
+        )
     )
     folder, zip_up = None, None
     if where.startswith("A folder"):
         folder = st.text_input("Folder path", placeholder=r"C:\Users\you\Documents\listing-photos")
     else:
         zip_up = st.file_uploader("Zip file of photos", type=["zip"])
-    mode_label = st.radio(
-        "Keep the photos…",
-        ["Copy into this app's data folder (recommended)", "Leave them where they are"],
-        horizontal=True,
-    )
-    mode = "copy" if mode_label.startswith("Copy") else "link"
+    if settings.hosted:
+        mode = "copy"
+    else:
+        mode_label = st.radio(
+            "Keep the photos…",
+            ["Copy into this app's data folder (recommended)", "Leave them where they are"],
+            horizontal=True,
+        )
+        mode = "copy" if mode_label.startswith("Copy") else "link"
 
     if st.button("Scan photos", disabled=not (folder or zip_up)):
         try:

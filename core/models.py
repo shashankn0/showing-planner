@@ -197,6 +197,8 @@ class Client(Base):
     label: Mapped[str] = mapped_column(String(120))
     # Stated preference chosen by the agent, never inferred: move_in_ready | renovation_ok | neutral
     condition_mode: Mapped[str] = mapped_column(String(24), default="neutral")
+    # The client's stated search criteria (ranking.preferences.Preferences.to_dict()).
+    preferences: Mapped[dict | None] = mapped_column(JSON)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

@@ -14,7 +14,7 @@ from core.models import Listing, Photo
 from sources.csv_import import analyze_file
 
 FIX = Path(__file__).parent / "fixtures"
-PAGES = ["listings", "photo_review", "labeling", "plan_day", "settings"]
+PAGES = ["find_homes", "listings", "photo_review", "labeling", "plan_day", "settings"]
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ def test_main_app_boots_with_navigation(settings):
     at = AppTest.from_file(str(Path(__file__).parents[1] / "app" / "main.py"), default_timeout=30)
     at.run()
     assert not at.exception, at.exception
-    assert any("Listings" in t.value for t in at.title)
+    assert any("Find Homes" in t.value for t in at.title)  # landing page
 
 
 def test_settings_page_saves_defaults(settings):
