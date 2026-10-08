@@ -21,6 +21,7 @@ from ranking.engine import Candidate, RankingResult, rank
 from ranking.preferences import Destination, Preferences
 from sources.base import RawListing
 from sources.csv_import import CsvImportSource, ImportAnalysis
+from sources.demo import DEFAULT_COUNT as DEMO_COUNT
 from sources.demo import demo_listings
 from sources.manual import ManualEntrySource
 from sources.photos import (
@@ -382,7 +383,7 @@ def ranking_table(result: RankingResult) -> pd.DataFrame:
 RENTCAST_CACHE_SECONDS = 6 * 3600
 
 
-def load_demo_listings(settings: Settings, n: int = 36) -> ImportSummary:
+def load_demo_listings(settings: Settings, n: int = DEMO_COUNT) -> ImportSummary:
     """Add clearly-labeled synthetic listings so anyone can try the app with no data."""
     summary = ImportSummary()
     with session_scope(settings) as s:

@@ -14,7 +14,7 @@ from core.config import Settings
 from core.db import init_db, session_scope
 from core.models import Listing
 from ranking.preferences import Preferences
-from sources.demo import demo_listings
+from sources.demo import DEFAULT_COUNT, demo_listings
 from sources.rentcast import RentCastError, RentCastSource, listing_from_payload
 from sources.values import parse_date
 
@@ -87,11 +87,11 @@ def settings(tmp_path, monkeypatch):
 
 def test_demo_listings_are_deterministic_labeled_and_varied():
     a, b = (
-        demo_listings(36, seed=7, today=date(2026, 10, 8)),
-        demo_listings(36, seed=7, today=date(2026, 10, 8)),
+        demo_listings(DEFAULT_COUNT, seed=7, today=date(2026, 10, 8)),
+        demo_listings(DEFAULT_COUNT, seed=7, today=date(2026, 10, 8)),
     )
     assert [x.dedupe_key for x in a] == [x.dedupe_key for x in b]
-    assert len(a) == 36 and len({x.dedupe_key for x in a}) == 36
+    assert len(a) == DEFAULT_COUNT and len({x.dedupe_key for x in a}) == DEFAULT_COUNT
     assert all(x.is_synthetic and x.source_listing_id.startswith("DEMO") for x in a)
     assert all(x.latitude and x.longitude and x.list_price for x in a)
     assert len({x.property_type for x in a}) >= 2 and len({x.beds for x in a}) >= 3
@@ -102,7 +102,7 @@ def test_demo_listings_are_deterministic_labeled_and_varied():
 def test_demo_listings_load_once_and_rank(settings):
     first = services.load_demo_listings(settings)
     again = services.load_demo_listings(settings)
-    assert first.new == 36 and again.new == 0 and again.updated == 36
+    assert first.new == DEFAULT_COUNT and again.new == 0 and again.updated == DEFAULT_COUNT
     res = services.run_ranking(settings, Preferences(max_price=500_000, min_beds=3))
     assert res.ranked and all(r.candidate.is_synthetic for r in res.ranked + res.excluded)
     df = services.listings_table(settings)
@@ -115,7 +115,7 @@ def test_demo_button_adds_listings_on_both_pages(settings):
     assert not at.exception, at.exception
     next(b for b in at.button if "demo listings" in b.label).click().run()
     assert not at.exception, at.exception
-    assert len(services.listings_table(settings)) == 36
+    assert len(services.listings_table(settings)) == DEFAULT_COUNT
     assert any(s.value.startswith("Tier ") or "Best" in s.value for s in at.subheader) or at.button
 
 

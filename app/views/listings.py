@@ -63,7 +63,7 @@ def render() -> None:
 def demo_button(settings, key: str) -> None:  # noqa: ANN001
     """One click to try the app with clearly-labeled synthetic listings."""
     if st.button(
-        "Try it with demo listings", key=key, help="36 made-up listings, labeled as demo data."
+        "Try it with demo listings", key=key, help="60 made-up listings, labeled as demo data."
     ):
         res = services.load_demo_listings(settings)
         st.success(

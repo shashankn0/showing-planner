@@ -25,20 +25,26 @@ CENTER = (33.75, -84.39)  # metro Atlanta, for plausible distances
 ACCESS = ["go_direct", "call_first", "appointment", "appointment"]
 
 
-def demo_listings(n: int = 36, seed: int = 7, today: date | None = None) -> list[RawListing]:
+DEFAULT_COUNT = 60
+
+
+def demo_listings(
+    n: int = DEFAULT_COUNT, seed: int = 7, today: date | None = None
+) -> list[RawListing]:
+    """A plausible mix: mostly 3-4 bedroom homes, prices tied to size, all within ~9 miles."""
     rng = random.Random(seed)
     today = today or date.today()
     out: list[RawListing] = []
     for i in range(n):
         kind = rng.choices(["Single Family Residential", "Townhouse", "Condo"], [6, 2, 2])[0]
-        sqft = {
-            "Single Family Residential": rng.randint(1200, 3800),
-            "Townhouse": rng.randint(1100, 2400),
-            "Condo": rng.randint(650, 1600),
-        }[kind]
-        beds = max(1, min(5, round(sqft / 700 + rng.choice([-1, 0, 0, 1]))))
+        if kind == "Condo":
+            beds = rng.choices([1, 2, 3], [3, 5, 2])[0]
+        else:
+            beds = rng.choices([2, 3, 4, 5], [2, 5, 4, 1])[0]
+        scale = 0.8 if kind != "Single Family Residential" else 1.0
+        sqft = int(round(scale * (500 + beds * 380) * rng.uniform(0.8, 1.2), -1))
         baths = max(1.0, min(4.5, beds - rng.choice([0, 0, 1]) + rng.choice([0.0, 0.5])))
-        ppsf = rng.uniform(140, 320)
+        ppsf = min(380.0, max(150.0, rng.gauss(240, 50)))
         price = int(round(sqft * ppsf, -3))
         full = int(baths)
         half = 1 if baths - full >= 0.5 else 0
@@ -55,8 +61,8 @@ def demo_listings(n: int = 36, seed: int = 7, today: date | None = None) -> list
                 state="GA",
                 postal_code=zip_code,
                 source_listing_id=f"DEMO{1000 + i}",
-                latitude=round(CENTER[0] + rng.uniform(-0.25, 0.25), 6),
-                longitude=round(CENTER[1] + rng.uniform(-0.30, 0.30), 6),
+                latitude=round(CENTER[0] + rng.uniform(-0.13, 0.13), 6),
+                longitude=round(CENTER[1] + rng.uniform(-0.16, 0.16), 6),
                 list_price=price,
                 status=status,
                 property_type=kind,
