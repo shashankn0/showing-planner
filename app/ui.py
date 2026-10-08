@@ -53,14 +53,17 @@ def reset_auth_throttle() -> None:
     _locked_until.clear()
 
 
-def _client_key() -> str:
-    """Best available identity of the visitor's network address.
+def _client_key(settings: Settings | None = None) -> str:
+    """Identity used to throttle sign-in attempts.
 
-    Behind a proxy (Cloudflare, most hosts) the proxy supplies the real address in a header. With
-    no proxy header all visitors share one key, which is the safe fallback: still brute-force
-    resistant, just not per-person. Headers can be forged when the app is exposed directly with
-    no proxy, so treat this as a speed bump, not authentication.
+    Client-address headers are only believed when the operator has said a trusted proxy sits in
+    front (TRUST_PROXY_HEADERS=true, e.g. a Cloudflare Tunnel). Otherwise anyone reaching the app
+    directly could forge them to dodge the limit, so every visitor shares one key: that still
+    blocks brute force, at the cost that a persistent attacker can lock the gate for everyone
+    (use a private Community Cloud app or Cloudflare Access when that matters).
     """
+    if not (settings and settings.trust_proxy_headers):
+        return "direct"
     try:
         headers = st.context.headers
         cf = headers.get("CF-Connecting-IP")
@@ -79,14 +82,21 @@ def _lock_remaining(now: float, key: str) -> float:
 
 
 def _note_failure(now: float, key: str) -> None:
-    if len(_failures) >= MAX_TRACKED_CLIENTS and key not in _failures:
-        _failures.clear()  # shed old state rather than grow without bound
-    recent = [t for t in _failures.get(key, []) if now - t < CLIENT_WINDOW_SECONDS]
-    recent.append(now)
-    _failures[key] = recent
+    # forget expired state so the tables stay small
+    for k in [k for k, t in _locked_until.items() if t <= now]:
+        del _locked_until[k]
+    for k in list(_failures):
+        _failures[k] = [t for t in _failures[k] if now - t < CLIENT_WINDOW_SECONDS]
+        if not _failures[k]:
+            del _failures[k]
+    # Spraying many fake addresses must not evict anyone's counts: once the table is full,
+    # new addresses share a single bucket instead.
+    bucket = key if (key in _failures or len(_failures) < MAX_TRACKED_CLIENTS) else "overflow"
+    recent = [*_failures.get(bucket, []), now]
+    _failures[bucket] = recent
     if len(recent) >= CLIENT_MAX_FAILURES:
-        _locked_until[key] = now + CLIENT_LOCK_SECONDS
-        _failures.pop(key, None)
+        _locked_until[bucket] = now + CLIENT_LOCK_SECONDS
+        _failures.pop(bucket, None)
 
 
 def _sweep_stale_workspaces(now: float | None = None) -> None:
@@ -134,6 +144,7 @@ def _session_workspace() -> Path:
 _SECRET_FIELDS = {
     "SHOWING_HOSTED": "hosted",
     "APP_PASSWORD": "app_password",
+    "TRUST_PROXY_HEADERS": "trust_proxy_headers",
     "ORS_API_KEY": "ors_api_key",
     "GOOGLE_MAPS_API_KEY": "google_maps_api_key",
     "NOMINATIM_USER_AGENT": "nominatim_user_agent",
@@ -151,13 +162,9 @@ def load_settings() -> Settings:
         value = secrets.get(key)
         if value in (None, ""):
             continue
-        if attr == "hosted":
-            settings.hosted = settings.hosted or str(value).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
+        if attr in {"hosted", "trust_proxy_headers"}:
+            on = str(value).strip().lower() in {"1", "true", "yes", "on"}
+            setattr(settings, attr, getattr(settings, attr) or on)
         elif not getattr(settings, attr) or attr == "nominatim_user_agent":
             setattr(settings, attr, str(value))
     return settings
@@ -224,7 +231,7 @@ def password_ok(settings: Settings) -> bool:
     if st.session_state.get("_authed"):
         return True
     st.title("Showing Planner")
-    client = _client_key()
+    client = _client_key(settings)
     remaining = _lock_remaining(time.monotonic(), client)
     if remaining > 0:
         st.error(

@@ -27,11 +27,11 @@ Spaces need a paid plan; only static Spaces are free [V]. GitHub Pages can't run
 3. **Keys go in the host's Secrets**, never in the repo. `.gitignore` already excludes `data/`,
    `.env` and databases.
 4. The password gate (`APP_PASSWORD`) slows guessing (8 tries per page load, a growing delay after
-   each wrong guess, and a 15-minute lock after 20 failures from the same client address, so one
-   attacker can't lock out everyone) but it is not strong authentication; client addresses come
-   from the host's proxy headers and can be forged if the app is exposed directly. Use a long
-   passphrase. For real confidentiality use Community Cloud's private app with an
-   email viewer list.
+   each wrong guess, and a 15-minute lock after 20 failures). Without `TRUST_PROXY_HEADERS=true`
+   all visitors share one counter, so a persistent attacker can lock the gate for everyone; with it
+   (only safe behind a proxy you control, like the Cloudflare tunnel in option B) failures are
+   counted per client address. It is not strong authentication. Use a long passphrase, and use
+   Community Cloud's private app (email sign-in) for anything that matters.
 
 ## Option A: Streamlit Community Cloud, step by step
 
@@ -79,6 +79,7 @@ winget install --id Cloudflare.cloudflared          # one time
 # window 1: start the app with a password
 cd C:\Users\snell\showing-planner
 $env:APP_PASSWORD = "choose-something-long"
+$env:TRUST_PROXY_HEADERS = "true"     # safe here: only Cloudflare's tunnel can reach the app
 .\.venv\Scripts\streamlit.exe run app/main.py --server.port 8501
 
 # window 2: open the tunnel

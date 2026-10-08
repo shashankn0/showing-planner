@@ -276,7 +276,7 @@ def test_secrets_can_turn_on_hosted_mode(settings, monkeypatch):
 
 def test_one_clients_failures_lock_only_that_client(settings, monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "open-sesame")
-    monkeypatch.setattr(ui, "_client_key", lambda: "203.0.113.7")  # the attacker
+    monkeypatch.setattr(ui, "_client_key", lambda _s=None: "203.0.113.7")  # the attacker
     # the attacker keeps reloading (fresh sessions) and guessing
     for _ in range(ui.CLIENT_MAX_FAILURES // 4):
         at = AppTest.from_file(MAIN, default_timeout=30).run()
@@ -288,7 +288,7 @@ def test_one_clients_failures_lock_only_that_client(settings, monkeypatch):
     assert not locked.text_input  # no form to type into, even for the right password
 
     # a different visitor is unaffected and can sign in
-    monkeypatch.setattr(ui, "_client_key", lambda: "198.51.100.20")
+    monkeypatch.setattr(ui, "_client_key", lambda _s=None: "198.51.100.20")
     other = AppTest.from_file(MAIN, default_timeout=30).run()
     other.text_input[0].set_value("open-sesame")
     other.button[0].click().run()
@@ -296,12 +296,12 @@ def test_one_clients_failures_lock_only_that_client(settings, monkeypatch):
 
     # the attacker is released once their lock expires
     ui._locked_until["203.0.113.7"] = 0.0
-    monkeypatch.setattr(ui, "_client_key", lambda: "203.0.113.7")
+    monkeypatch.setattr(ui, "_client_key", lambda _s=None: "203.0.113.7")
     again = AppTest.from_file(MAIN, default_timeout=30).run()
     assert again.text_input
 
 
-def test_client_key_prefers_proxy_headers(monkeypatch):
+def test_forged_proxy_headers_are_ignored_unless_a_proxy_is_trusted(monkeypatch):
     class H(dict):
         def get(self, k, d=None):
             return super().get(k, d)
@@ -310,17 +310,40 @@ def test_client_key_prefers_proxy_headers(monkeypatch):
         headers = H({"CF-Connecting-IP": "198.51.100.9", "X-Forwarded-For": "1.1.1.1, 2.2.2.2"})
 
     monkeypatch.setattr(ui.st, "context", Ctx())
-    assert ui._client_key() == "198.51.100.9"
-    Ctx.headers = H({"X-Forwarded-For": "6.6.6.6, 2.2.2.2"})  # last hop is the trusted proxy's
-    assert ui._client_key() == "2.2.2.2"
+    untrusted = Settings(data_dir=Path("."))
+    assert ui._client_key(untrusted) == "direct"  # attacker-controlled headers don't pick the key
+    assert ui._client_key(None) == "direct"
+    trusted = Settings(data_dir=Path("."), trust_proxy_headers=True)
+    assert ui._client_key(trusted) == "198.51.100.9"
+    Ctx.headers = H({"X-Forwarded-For": "6.6.6.6, 2.2.2.2"})  # last hop is our proxy's
+    assert ui._client_key(trusted) == "2.2.2.2"
     Ctx.headers = H({})
-    assert ui._client_key() == "direct"
+    assert ui._client_key(trusted) == "direct"
 
 
-def test_throttle_state_stays_bounded(monkeypatch):
-    for i in range(ui.MAX_TRACKED_CLIENTS + 50):
-        ui._note_failure(1000.0, f"10.0.{i // 250}.{i % 250}")
-    assert len(ui._failures) <= ui.MAX_TRACKED_CLIENTS
+def test_spraying_addresses_cannot_reset_other_clients_state(monkeypatch):
+    monkeypatch.setattr(ui, "MAX_TRACKED_CLIENTS", 50)
+    for _ in range(ui.CLIENT_MAX_FAILURES - 1):
+        ui._note_failure(1000.0, "victim-attacker")
+    assert len(ui._failures["victim-attacker"]) == ui.CLIENT_MAX_FAILURES - 1
+    for i in range(500):  # attacker sprays forged addresses
+        ui._note_failure(1000.0, f"fake-{i}")
+    assert len(ui._failures) <= 51  # bounded (50 tracked + the shared overflow bucket)
+    assert len(ui._failures["victim-attacker"]) == ui.CLIENT_MAX_FAILURES - 1  # not evicted
+    ui._note_failure(1000.0, "victim-attacker")  # the 20th failure still locks them
+    assert ui._lock_remaining(1001.0, "victim-attacker") > 0
+
+
+def test_expired_throttle_state_is_pruned():
+    ui._note_failure(1000.0, "a")
+    ui._locked_until["b"] = 500.0
+    ui._note_failure(1000.0 + ui.CLIENT_WINDOW_SECONDS + 1, "c")
+    assert "a" not in ui._failures and "b" not in ui._locked_until
+
+
+def test_trust_proxy_flag_can_come_from_secrets(settings, monkeypatch):
+    monkeypatch.setattr(ui.st, "secrets", {"TRUST_PROXY_HEADERS": "true"})
+    assert ui.load_settings().trust_proxy_headers
 
 
 def test_each_wrong_guess_adds_a_delay(settings, monkeypatch):

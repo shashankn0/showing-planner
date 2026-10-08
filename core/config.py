@@ -55,6 +55,10 @@ class Settings:
     # Hosted (shared website) mode: every visitor gets an isolated, temporary workspace.
     hosted: bool = False
     app_password: str | None = None
+    # Only set when a proxy YOU control sits in front (e.g. Cloudflare Tunnel): client-address
+    # headers can be forged by anyone who reaches the app directly.
+    trust_proxy_headers: bool = False
+    rentcast_api_key: str | None = None
 
     @property
     def db_path(self) -> Path:
@@ -97,6 +101,8 @@ class Settings:
             nominatim_user_agent=os.environ.get("NOMINATIM_USER_AGENT") or DEFAULT_NOMINATIM_UA,
             hosted=_truthy(os.environ.get("SHOWING_HOSTED")) or Path("/mount/src").is_dir(),
             app_password=os.environ.get("APP_PASSWORD") or None,
+            trust_proxy_headers=_truthy(os.environ.get("TRUST_PROXY_HEADERS")),
+            rentcast_api_key=os.environ.get("RENTCAST_API_KEY") or None,
         )
         s.prefs = UserPrefs.load(s.prefs_path)
         return s
