@@ -4,7 +4,11 @@ A web app for real estate agents. Tell it what a client wants and it ranks your 
 **tier list (S to D)**, showing the reasons behind every placement:
 
 1. **Find Homes**: enter budget, beds/baths, size, places the client drives to, and how they feel
-   about condition; get a tier list with strengths, watch-outs and a score breakdown.
+   about condition; get a tier list with strengths, watch-outs and a score breakdown. Press
+   **☆ Save** on a card to track it.
+1b. **Saved Homes**: a status pipeline (interested, toured, offer, passed) with notes, links to Google
+   Maps, a KML export for Google Earth, and an optional 3D view. Optional Google sign-in. See
+   [docs/WEBSITE.md](docs/WEBSITE.md) for the path from local tool to website.
 2. **Photo condition scoring**: scores listing photos for physical condition (room type,
    1-5 condition, flags), sets aside floor plans/maps/logos/duplicates, and feeds the tiers.
    Optional install; train it on your own ratings. See [docs/VISION.md](docs/VISION.md).
@@ -34,6 +38,9 @@ pip install -r requirements.txt
 copy .env.example .env        # optional: add keys later
 streamlit run app/main.py
 ```
+
+After the first setup you can just double-click **`start.bat`**; the app opens at
+<http://localhost:8501>.
 
 Photo scoring is optional (about 1 GB, plus a ~600 MB model download on first use):
 
@@ -65,7 +72,9 @@ Real-browser tests: `pip install playwright`, `python -m playwright install chro
 4b. **Labeling**: rate photos 1-5 with one keypress (`1`-`5`; `K B L R E O` room; `W F T C P`
    flags; `N` unsure, `S` skip, `U` undo, `X` exclude). After ~50 labels, *Train from my labels*
    compares models on a holdout you never trained on and tells you if it beats the baseline.
-5. **Settings** holds defaults, key status and saved layouts.
+5. **Saved Homes**: change a home's status, add notes, pick a home to open in Google Maps or satellite
+   view, and download all saved homes as KML (Google Earth: *File > Import KML file*).
+6. **Settings** holds defaults, key status and saved layouts.
 
 Old Excel `.xls` files aren't supported: in Excel, use *Save As -> CSV* or *.xlsx*.
 
@@ -83,6 +92,9 @@ If an export uses unusual column names, add them to
   export.
 - Map lookups send **street addresses to the free US Census geocoder** (and, only if you enable it
   in `.env`, to OpenStreetMap's Nominatim). Untick "Look up map coordinates" to stay offline.
+- The optional **3D view** loads Google's map in your browser and asks the US Geological Survey for the
+  ground height at that home's coordinates. It runs only for a home you switch it on for, and only
+  if you set `GOOGLE_MAPS_API_KEY`.
 - Don't import alarm or lockbox codes. The importer masks digits following words like "code" or
   "alarm" in showing instructions as a safety net; it is not a guarantee.
 - Keep client records to nicknames.

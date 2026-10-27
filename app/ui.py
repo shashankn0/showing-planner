@@ -243,6 +243,11 @@ def context() -> Settings:
         settings.data_dir = _session_workspace()
         settings.prefs = UserPrefs.load(settings.prefs_path)
         st.info(HOSTED_NOTE, icon="🔒")
+    elif email := signed_in_email():
+        # one folder per signed-in user (a hash, so an email can't climb out of the data folder)
+        who = hashlib.sha256(email.encode()).hexdigest()[:16]
+        settings.data_dir = settings.data_dir / "users" / who
+        settings.prefs = UserPrefs.load(settings.prefs_path)
     if st.session_state.get("_db_ready") != str(settings.data_dir):
         init_db(settings)
         st.session_state["_db_ready"] = str(settings.data_dir)
@@ -283,6 +288,42 @@ def password_ok(settings: Settings) -> bool:
                 st.rerun()  # show the lockout message right away
             st.error("That password isn't right.")
     return False
+
+
+def auth_configured() -> bool:
+    """True when Streamlit's built-in sign-in is set up (an [auth] section in the secrets)."""
+    try:
+        return "auth" in st.secrets
+    except Exception:  # noqa: BLE001  (no secrets file locally)
+        return False
+
+
+def signed_in_email() -> str | None:
+    """The verified email of the signed-in user, or None (also None when sign-in isn't set up)."""
+    if not auth_configured() or not getattr(st.user, "is_logged_in", False):
+        return None
+    email = str(st.user.get("email") or "").strip().lower()
+    return email if email and st.user.get("email_verified", True) else None
+
+
+def login_ok() -> bool:
+    """Google sign-in gate; a no-op until [auth] is in the secrets (docs/WEBSITE.md)."""
+    if not auth_configured() or signed_in_email():
+        return True
+    st.title("Showing Planner")
+    if getattr(st.user, "is_logged_in", False):
+        st.error("That account has no verified email address, so it can't be used here.")
+        st.button("Sign out", on_click=st.logout)
+    else:
+        st.write("Sign in to open your saved homes and searches.")
+        st.button("Sign in with Google", type="primary", on_click=st.login)
+    return False
+
+
+def account_box() -> None:
+    if email := signed_in_email():
+        st.sidebar.caption(f"Signed in as {email}")
+        st.sidebar.button("Sign out", on_click=st.logout)
 
 
 def md(text: object) -> str:

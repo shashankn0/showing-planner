@@ -203,6 +203,24 @@ class Client(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+PIPELINE = ("interested", "toured", "offer", "passed")  # where a saved home stands, in order
+
+
+class SavedHome(Base):
+    """A listing the agent is tracking. One row per listing, so saving twice does nothing."""
+
+    __tablename__ = "saved_homes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), unique=True
+    )
+    status: Mapped[str] = mapped_column(String(16), default="interested")
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 # --------------------------------------------------------------------------- routing
 
 

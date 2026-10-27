@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from core.config import Settings
 from core.db import session_scope
 from core.geocoding import Geocoder, GeocodeReport, Http
-from core.models import Client, ImportBatch, Listing, ListingScore, Photo
+from core.models import PIPELINE, Client, ImportBatch, Listing, ListingScore, Photo, SavedHome
 from core.store import upsert_listings
 from ranking.engine import Candidate, RankingResult, rank
 from ranking.preferences import Destination, Preferences
@@ -356,6 +356,86 @@ def load_client_prefs(settings: Settings, client_id: int) -> Preferences | None:
         if client is None or not client.preferences:
             return None
         return Preferences.from_dict(client.preferences)
+
+
+# ------------------------------------------------------------------ saved homes (tracking)
+
+
+@dataclass
+class SavedItem:
+    listing_id: int
+    address: str
+    price: int | None
+    beds: int | None
+    baths: float | None
+    sqft: int | None
+    lat: float | None
+    lon: float | None
+    status: str
+    notes: str
+    is_synthetic: bool
+
+
+def saved_ids(settings: Settings) -> set[int]:
+    with session_scope(settings) as s:
+        return set(s.scalars(select(SavedHome.listing_id)))
+
+
+def save_home(settings: Settings, listing_id: int) -> None:
+    """Start tracking a listing. Saving one that is already saved changes nothing."""
+    with session_scope(settings) as s:
+        if s.get(Listing, listing_id) is None:
+            raise ValueError("That listing no longer exists.")
+        if s.scalar(select(SavedHome).where(SavedHome.listing_id == listing_id)) is None:
+            s.add(SavedHome(listing_id=listing_id))
+
+
+def update_saved(
+    settings: Settings, listing_id: int, *, status: str | None = None, notes: str | None = None
+) -> None:
+    if status is not None and status not in PIPELINE:
+        raise ValueError(f"Status must be one of {list(PIPELINE)}.")
+    with session_scope(settings) as s:
+        row = s.scalar(select(SavedHome).where(SavedHome.listing_id == listing_id))
+        if row is None:
+            raise ValueError("That home isn't saved.")
+        if status is not None:
+            row.status = status
+        if notes is not None:
+            row.notes = notes.strip() or None
+
+
+def unsave_home(settings: Settings, listing_id: int) -> None:
+    with session_scope(settings) as s:
+        row = s.scalar(select(SavedHome).where(SavedHome.listing_id == listing_id))
+        if row is not None:
+            s.delete(row)
+
+
+def saved_homes(settings: Settings) -> list[SavedItem]:
+    """Saved homes, newest first, with the listing facts the pipeline page shows."""
+    with session_scope(settings) as s:
+        q = (
+            select(SavedHome, Listing)
+            .join(Listing, Listing.id == SavedHome.listing_id)
+            .order_by(SavedHome.created_at.desc(), SavedHome.id.desc())
+        )
+        return [
+            SavedItem(
+                listing_id=lst.id,
+                address=lst.address_full,
+                price=lst.list_price,
+                beds=lst.beds,
+                baths=lst.baths_total,
+                sqft=lst.sqft,
+                lat=lst.latitude,
+                lon=lst.longitude,
+                status=row.status,
+                notes=row.notes or "",
+                is_synthetic=lst.is_synthetic,
+            )
+            for row, lst in s.execute(q)
+        ]
 
 
 def first_photos(settings: Settings, listing_ids: list[int]) -> dict[int, Photo]:

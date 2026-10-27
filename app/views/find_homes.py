@@ -268,13 +268,14 @@ def _show(settings, result: RankingResult, prefs: Preferences) -> None:  # noqa:
         for col, tier in zip(cols, [t for t in TIER_BLURBS if t in by_tier], strict=False):
             col.metric(f"Tier {tier}", len(by_tier[tier]))
         photos = services.first_photos(settings, [r.candidate.id for r in ranked])
+        saved = services.saved_ids(settings)
         for tier in TIER_BLURBS:
             group = by_tier.get(tier)
             if not group:
                 continue
             st.subheader(f"Tier {tier} · {TIER_BLURBS[tier]} ({len(group)})")
             for r in group:
-                _card(settings, r, photos.get(r.candidate.id))
+                _card(settings, r, photos.get(r.candidate.id), r.candidate.id in saved)
         st.download_button(
             "Download tier list (CSV)",
             services.ranking_table(result).to_csv(index=False),
@@ -287,7 +288,7 @@ def _show(settings, result: RankingResult, prefs: Preferences) -> None:  # noqa:
                 st.markdown(md(f"**{r.candidate.address}**: " + "; ".join(r.excluded_reasons)))
 
 
-def _card(settings, r: Ranked, photo) -> None:  # noqa: ANN001
+def _card(settings, r: Ranked, photo, saved: bool) -> None:  # noqa: ANN001
     c = r.candidate
     with st.container(border=True):
         left, mid, right = st.columns([1, 3, 4])
@@ -295,6 +296,15 @@ def _card(settings, r: Ranked, photo) -> None:  # noqa: ANN001
             st.badge(f"Tier {r.tier}", color=TIER_COLORS[r.tier])
             st.metric("Score", "—" if r.score is None else f"{r.score:.0f}")
             st.caption(f"{r.coverage:.0%} of factors had data")
+            if saved:
+                st.caption("★ Saved")
+            else:
+                st.button(
+                    "☆ Save",
+                    key=f"save_{c.id}",
+                    on_click=services.save_home,
+                    args=(settings, c.id),
+                )
         with mid:
             if photo is not None:
                 thumb = thumbnail(settings, photo, 360)

@@ -10,3 +10,6 @@ requests==2.34.2
 python-dotenv==1.2.4
 pillow==12.3.0
 openpyxl==3.1.5
+# Optional Google sign-in (st.login). Only used when an [auth] section is in the secrets.
+Authlib==1.9.1
+httpx==0.28.1

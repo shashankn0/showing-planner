@@ -6,7 +6,15 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.ui import DATA_NOTE, HOSTED_NOTE, context, disclaimer, wipe_workspace
+from app.ui import (
+    DATA_NOTE,
+    HOSTED_NOTE,
+    auth_configured,
+    context,
+    disclaimer,
+    signed_in_email,
+    wipe_workspace,
+)
 from core.config import DEFAULT_NOMINATIM_UA
 from sources.profiles import delete_profile, load_profiles
 
@@ -69,6 +77,23 @@ def _photo_scoring_section(settings) -> None:  # noqa: ANN001
         for row in _zero_shot_versions(settings):
             done += refresh_rollups(settings, row)
         st.success(f"Saved. Recalculated {done} listing score(s).")
+
+
+AUTH_EXAMPLE = Path(__file__).resolve().parents[2] / ".streamlit" / "secrets.toml.example"
+
+
+def _sign_in_section() -> None:
+    st.subheader("Google sign-in")
+    if auth_configured():
+        email = signed_in_email()
+        st.success(f"On. Signed in as {email}." if email else "On.")
+        return
+    st.caption(
+        "Off. Visitors aren't asked to sign in. To require a Google sign-in, create an OAuth "
+        "client (steps in docs/WEBSITE.md), then add this to `.streamlit/secrets.toml` or your "
+        "host's Secrets and restart."
+    )
+    st.code(AUTH_EXAMPLE.read_text(encoding="utf-8"), language="toml")
 
 
 def _zero_shot_versions(settings) -> list[str]:  # noqa: ANN001
@@ -136,6 +161,8 @@ def render() -> None:
         ),
     ]
     st.dataframe([{"Service": a, "Status": b} for a, b in rows], hide_index=True, width="stretch")
+
+    _sign_in_section()
 
     _photo_scoring_section(settings)
 

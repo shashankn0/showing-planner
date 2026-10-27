@@ -14,7 +14,7 @@ from core.models import Listing, Photo
 from sources.csv_import import analyze_file
 
 FIX = Path(__file__).parent / "fixtures"
-PAGES = ["find_homes", "listings", "photo_review", "labeling", "plan_day", "settings"]
+PAGES = ["find_homes", "saved", "listings", "photo_review", "labeling", "plan_day", "settings"]
 
 
 @pytest.fixture

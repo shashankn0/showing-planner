@@ -3,3 +3,25 @@ maxUploadSize = 200
 
 [browser]
 gatherUsageStats = false
+
+# Deep teal on warm neutrals; follows the visitor's light/dark setting.
+[theme]
+baseRadius = "0.75rem"
+buttonRadius = "0.6rem"
+headingFontWeights = [750, 700, 650, 600, 600, 600]
+
+[theme.light]
+primaryColor = "#0f766e"
+backgroundColor = "#fafaf7"
+secondaryBackgroundColor = "#eef2ef"
+textColor = "#1b2b28"
+linkColor = "#0f766e"
+borderColor = "#d5ddd9"
+
+[theme.dark]
+primaryColor = "#2dd4bf"
+backgroundColor = "#0f1715"
+secondaryBackgroundColor = "#17231f"
+textColor = "#e6efec"
+linkColor = "#2dd4bf"
+borderColor = "#2a3a35"
